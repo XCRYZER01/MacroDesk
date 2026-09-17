@@ -39,7 +39,7 @@ USB HID Keyboard
 Windows PC
    ↓
 Fusion 360 / OrcaSlicer / Bambu Studio
-```
+```พ
 
 ---
 

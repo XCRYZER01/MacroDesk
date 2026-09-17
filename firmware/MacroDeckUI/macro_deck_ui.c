@@ -11,6 +11,7 @@
 #define C_HEX(hex) lv_color_hex(hex)
 
 extern const uint8_t ui_reference_rgb888[];
+extern const uint8_t ui_orca_rgb888[];
 
 typedef struct {
     const char *icon;
@@ -36,6 +37,9 @@ static lv_obj_t *s_time_label;
 static macro_deck_action_cb_t s_action_cb;
 static void *s_action_user_data;
 static lv_color_t *s_reference_pixels;
+static lv_obj_t *s_reference_canvas;
+static lv_obj_t *s_fusion_hotspots;
+static lv_obj_t *s_orca_hotspots;
 
 static lv_style_t s_style_screen;
 static lv_style_t s_style_panel;
@@ -45,6 +49,9 @@ static lv_style_t s_style_selected;
 static lv_style_t s_style_text;
 static lv_style_t s_style_muted;
 static bool s_styles_ready;
+
+static void load_reference_image(const uint8_t *source_pixels);
+static void set_active_profile(macro_action_t profile);
 
 static const action_spec_t s_main_actions[] = {
     {LV_SYMBOL_FILE, "New Design", "Ctrl + N", MACRO_ACTION_NEW_DESIGN, 0xB8D8FF},
@@ -141,7 +148,14 @@ static void action_event_cb(lv_event_t *event)
 {
     if (lv_event_get_code(event) != LV_EVENT_CLICKED) return;
     const action_spec_t *spec = (const action_spec_t *)lv_event_get_user_data(event);
-    if (spec != NULL && s_action_cb != NULL) {
+    if (spec == NULL) return;
+
+    if (spec->action == MACRO_ACTION_PROFILE_FUSION ||
+        spec->action == MACRO_ACTION_PROFILE_ORCA) {
+        set_active_profile(spec->action);
+    }
+
+    if (s_action_cb != NULL) {
         s_action_cb(spec->action, s_action_user_data);
     }
 }
@@ -190,45 +204,153 @@ static void build_reference_ui(lv_obj_t *parent)
         LV_ASSERT_MALLOC(s_reference_pixels);
         if (s_reference_pixels == NULL) return;
 
-        for (uint32_t i = 0; i < 800U * 480U; ++i) {
-            const uint32_t source = i * 3U;
-            s_reference_pixels[i] = lv_color_make(
-                ui_reference_rgb888[source],
-                ui_reference_rgb888[source + 1U],
-                ui_reference_rgb888[source + 2U]
-            );
-        }
     }
 
-    lv_obj_t *background = lv_canvas_create(parent);
-    lv_canvas_set_buffer(background, s_reference_pixels, 800, 480, LV_IMG_CF_TRUE_COLOR);
-    lv_obj_set_pos(background, 0, 0);
-    lv_obj_clear_flag(background, LV_OBJ_FLAG_CLICKABLE);
+    s_reference_canvas = lv_canvas_create(parent);
+    lv_canvas_set_buffer(s_reference_canvas, s_reference_pixels, 800, 480, LV_IMG_CF_TRUE_COLOR);
+    lv_obj_set_pos(s_reference_canvas, 0, 0);
+    lv_obj_clear_flag(s_reference_canvas, LV_OBJ_FLAG_CLICKABLE);
+    load_reference_image(ui_reference_rgb888);
+
+    s_fusion_hotspots = lv_obj_create(parent);
+    lv_obj_remove_style_all(s_fusion_hotspots);
+    lv_obj_set_size(s_fusion_hotspots, 800, 480);
+    lv_obj_clear_flag(s_fusion_hotspots, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SCROLLABLE);
 
     for (size_t i = 0; i < sizeof(s_nav_actions) / sizeof(s_nav_actions[0]); ++i) {
-        make_hotspot(parent, &s_nav_actions[i], 4, 84 + (lv_coord_t)i * 42, 123, 41);
+        make_hotspot(s_fusion_hotspots, &s_nav_actions[i], 4, 84 + (lv_coord_t)i * 42, 123, 41);
     }
 
     for (size_t i = 0; i < sizeof(s_main_actions) / sizeof(s_main_actions[0]); ++i) {
         const lv_coord_t col = (lv_coord_t)(i % 5);
         const lv_coord_t row = (lv_coord_t)(i / 5);
-        make_hotspot(parent, &s_main_actions[i], 133 + col * 97, 88 + row * 85, 93, 82);
+        make_hotspot(s_fusion_hotspots, &s_main_actions[i], 133 + col * 97, 88 + row * 85, 93, 82);
     }
 
-    make_hotspot(parent, &view_actions[0], 626, 174, 48, 58);
-    make_hotspot(parent, &view_actions[1], 681, 174, 48, 58);
-    make_hotspot(parent, &view_actions[2], 737, 174, 49, 58);
-    make_hotspot(parent, &view_actions[3], 638, 242, 56, 58);
-    make_hotspot(parent, &view_actions[4], 713, 242, 57, 58);
+    make_hotspot(s_fusion_hotspots, &view_actions[0], 626, 174, 48, 58);
+    make_hotspot(s_fusion_hotspots, &view_actions[1], 681, 174, 48, 58);
+    make_hotspot(s_fusion_hotspots, &view_actions[2], 737, 174, 49, 58);
+    make_hotspot(s_fusion_hotspots, &view_actions[3], 638, 242, 56, 58);
+    make_hotspot(s_fusion_hotspots, &view_actions[4], 713, 242, 57, 58);
 
     for (size_t i = 0; i < 3; ++i) {
-        make_hotspot(parent, &display_actions[i], 628 + (lv_coord_t)i * 55, 334, 50, 69);
+        make_hotspot(s_fusion_hotspots, &display_actions[i], 628 + (lv_coord_t)i * 55, 334, 50, 69);
     }
 
-    make_hotspot(parent, &profile_actions[0], 78, 432, 128, 40);
-    make_hotspot(parent, &profile_actions[1], 208, 432, 128, 40);
-    make_hotspot(parent, &profile_actions[2], 337, 432, 142, 40);
-    make_hotspot(parent, &profile_actions[3], 480, 432, 122, 40);
+    make_hotspot(s_fusion_hotspots, &profile_actions[0], 78, 432, 128, 40);
+    make_hotspot(s_fusion_hotspots, &profile_actions[1], 208, 432, 128, 40);
+    make_hotspot(s_fusion_hotspots, &profile_actions[2], 337, 432, 142, 40);
+    make_hotspot(s_fusion_hotspots, &profile_actions[3], 480, 432, 122, 40);
+
+    static const action_spec_t orca_nav_actions[] = {
+        {"P", "Prepare", "", MACRO_ACTION_ORCA_PREPARE, 0x24D4C1},
+        {"M", "Modify", "", MACRO_ACTION_ORCA_MODIFY, 0xB7C9E8},
+        {"V", "View", "", MACRO_ACTION_ORCA_VIEW, 0xB7C9E8},
+        {"S", "Support", "", MACRO_ACTION_ORCA_SUPPORT, 0xB7C9E8},
+        {"F", "Filament", "", MACRO_ACTION_ORCA_FILAMENT, 0xB7C9E8},
+        {"P", "Printer", "", MACRO_ACTION_ORCA_PRINTER, 0xB7C9E8},
+        {"T", "Tools", "", MACRO_ACTION_ORCA_TOOLS, 0xB7C9E8},
+        {LV_SYMBOL_SETTINGS, "Settings", "", MACRO_ACTION_ORCA_SETTINGS, 0xB7C9E8},
+    };
+    static const action_spec_t orca_actions[] = {
+        {LV_SYMBOL_FILE, "New Project", "Ctrl + N", MACRO_ACTION_ORCA_NEW_PROJECT, 0x55BFFF},
+        {LV_SYMBOL_DIRECTORY, "Open Project", "Ctrl + O", MACRO_ACTION_ORCA_OPEN_PROJECT, 0x55BFFF},
+        {LV_SYMBOL_SAVE, "Save Project", "Ctrl + S", MACRO_ACTION_ORCA_SAVE_PROJECT, 0x55BFFF},
+        {LV_SYMBOL_DIRECTORY, "Import Model", "Ctrl + I", MACRO_ACTION_ORCA_IMPORT_MODEL, 0x55BFFF},
+        {LV_SYMBOL_SETTINGS, "Preferences", "Ctrl + P", MACRO_ACTION_ORCA_PREFERENCES, 0x55BFFF},
+        {"A", "Arrange", "A", MACRO_ACTION_ORCA_ARRANGE, 0x55BFFF},
+        {"Q", "Auto Orient", "Q", MACRO_ACTION_ORCA_AUTO_ORIENT, 0x55BFFF},
+        {"M", "Move", "M", MACRO_ACTION_MOVE, 0x3A9BFF},
+        {"R", "Rotate", "R", MACRO_ACTION_ORCA_ROTATE, 0x3A9BFF},
+        {"S", "Scale", "S", MACRO_ACTION_ORCA_SCALE, 0x3A9BFF},
+        {"F", "Lay Flat", "F", MACRO_ACTION_ORCA_LAY_FLAT, 0x55BFFF},
+        {"C", "Cut", "C", MACRO_ACTION_ORCA_CUT, 0x55BFFF},
+        {"B", "Mesh Boolean", "B", MACRO_ACTION_ORCA_MESH_BOOLEAN, 0x55BFFF},
+        {"P", "Seam Painting", "P", MACRO_ACTION_ORCA_SEAM_PAINTING, 0xA14CFF},
+        {"T", "Add Text", "T", MACRO_ACTION_ORCA_ADD_TEXT, 0x68B7FF},
+        {LV_SYMBOL_LEFT, "Undo", "Ctrl + Z", MACRO_ACTION_UNDO, 0xBED4F7},
+        {LV_SYMBOL_RIGHT, "Redo", "Ctrl + Y", MACRO_ACTION_REDO, 0xBED4F7},
+        {LV_SYMBOL_TRASH, "Delete", "Del", MACRO_ACTION_ORCA_DELETE, 0xFF5964},
+        {"S", "Slice", "Ctrl + R", MACRO_ACTION_ORCA_SLICE, 0x30E57B},
+        {LV_SYMBOL_UPLOAD, "Print Plate", "Ctrl + Shift + G", MACRO_ACTION_ORCA_PRINT_PLATE, 0x31C8F5},
+    };
+    static const action_spec_t orca_bottom_actions[] = {
+        {"F", "Fusion 360", "", MACRO_ACTION_PROFILE_FUSION, COLOR_ORANGE},
+        {"O", "Orca Slicer", "", MACRO_ACTION_PROFILE_ORCA, 0x24D4C1},
+        {"B", "Bambu Studio", "", MACRO_ACTION_PROFILE_BAMBU, 0x45C866},
+        {LV_SYMBOL_SETTINGS, "System", "", MACRO_ACTION_PROFILE_SYSTEM, 0xBED4F7},
+    };
+    static const action_spec_t orca_view_actions[] = {
+        {"0", "Default", "Ctrl + 0", MACRO_ACTION_ORCA_VIEW_DEFAULT, 0xBED4F7},
+        {"1", "Top", "Ctrl + 1", MACRO_ACTION_ORCA_VIEW_TOP, 0xBED4F7},
+        {"2", "Bottom", "Ctrl + 2", MACRO_ACTION_ORCA_VIEW_BOTTOM, 0xBED4F7},
+        {"3", "Front", "Ctrl + 3", MACRO_ACTION_ORCA_VIEW_FRONT, 0xBED4F7},
+        {"4", "Behind", "Ctrl + 4", MACRO_ACTION_ORCA_VIEW_BEHIND, 0xBED4F7},
+    };
+    static const action_spec_t orca_display_actions[] = {
+        {"5", "Left", "Ctrl + 5", MACRO_ACTION_ORCA_VIEW_LEFT, 0x24D4C1},
+        {"6", "Right", "Ctrl + 6", MACRO_ACTION_ORCA_VIEW_RIGHT, 0xBED4F7},
+        {"P", "Preview", "Tab", MACRO_ACTION_ORCA_VIEW_PREVIEW, 0xBED4F7},
+    };
+
+    s_orca_hotspots = lv_obj_create(parent);
+    lv_obj_remove_style_all(s_orca_hotspots);
+    lv_obj_set_size(s_orca_hotspots, 800, 480);
+    lv_obj_clear_flag(s_orca_hotspots, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SCROLLABLE);
+
+    for (size_t i = 0; i < 8; ++i) {
+        make_hotspot(s_orca_hotspots, &orca_nav_actions[i], 4, 84 + (lv_coord_t)i * 42, 123, 41);
+    }
+    for (size_t i = 0; i < 20; ++i) {
+        const lv_coord_t col = (lv_coord_t)(i % 5);
+        const lv_coord_t row = (lv_coord_t)(i / 5);
+        make_hotspot(s_orca_hotspots, &orca_actions[i],
+                     133 + col * 97, 88 + row * 85, 93, 82);
+    }
+    make_hotspot(s_orca_hotspots, &orca_nav_actions[5], 626, 88, 160, 66);
+    make_hotspot(s_orca_hotspots, &orca_view_actions[0], 626, 174, 48, 58);
+    make_hotspot(s_orca_hotspots, &orca_view_actions[1], 681, 174, 48, 58);
+    make_hotspot(s_orca_hotspots, &orca_view_actions[2], 737, 174, 49, 58);
+    make_hotspot(s_orca_hotspots, &orca_view_actions[3], 638, 242, 56, 58);
+    make_hotspot(s_orca_hotspots, &orca_view_actions[4], 713, 242, 57, 58);
+    for (size_t i = 0; i < 3; ++i) {
+        make_hotspot(s_orca_hotspots, &orca_display_actions[i],
+                     628 + (lv_coord_t)i * 55, 334, 50, 69);
+    }
+    make_hotspot(s_orca_hotspots, &orca_bottom_actions[0], 78, 432, 128, 40);
+    make_hotspot(s_orca_hotspots, &orca_bottom_actions[1], 208, 432, 128, 40);
+    make_hotspot(s_orca_hotspots, &orca_bottom_actions[2], 337, 432, 142, 40);
+    make_hotspot(s_orca_hotspots, &orca_bottom_actions[3], 480, 432, 122, 40);
+    make_hotspot(s_orca_hotspots, &orca_nav_actions[7], 744, 12, 44, 44);
+    lv_obj_add_flag(s_orca_hotspots, LV_OBJ_FLAG_HIDDEN);
+}
+
+static void load_reference_image(const uint8_t *source_pixels)
+{
+    if (s_reference_pixels == NULL || source_pixels == NULL) return;
+    for (uint32_t i = 0; i < 800U * 480U; ++i) {
+        const uint32_t source = i * 3U;
+        s_reference_pixels[i] = lv_color_make(
+            source_pixels[source], source_pixels[source + 1U], source_pixels[source + 2U]
+        );
+    }
+    if (s_reference_canvas != NULL) lv_obj_invalidate(s_reference_canvas);
+}
+
+static void set_active_profile(macro_action_t profile)
+{
+    if (s_fusion_hotspots == NULL || s_orca_hotspots == NULL) return;
+    if (profile == MACRO_ACTION_PROFILE_ORCA) {
+        load_reference_image(ui_orca_rgb888);
+        lv_obj_add_flag(s_fusion_hotspots, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_clear_flag(s_orca_hotspots, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_move_foreground(s_orca_hotspots);
+    } else {
+        load_reference_image(ui_reference_rgb888);
+        lv_obj_add_flag(s_orca_hotspots, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_clear_flag(s_fusion_hotspots, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_move_foreground(s_fusion_hotspots);
+    }
 }
 
 static lv_obj_t *make_action_card(lv_obj_t *parent, const action_spec_t *spec,

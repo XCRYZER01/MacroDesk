@@ -18,7 +18,7 @@ internal SRAM and the board will reboot if this option is disabled.
 
 ```powershell
 $cli = "$env:LOCALAPPDATA\Programs\Arduino IDE\resources\app\lib\backend\resources\arduino-cli.exe"
-$fqbn = 'esp32:esp32:waveshare_esp32_s3_touch_lcd_7:PSRAM=enabled,FlashSize=16M,PartitionScheme=app3M_fat9M_16MB'
+$fqbn = 'esp32:esp32:waveshare_esp32_s3_touch_lcd_7:PSRAM=enabled,FlashSize=16M,PartitionScheme=app3M_fat9M_16MB,USBMode=default,CDCOnBoot=default,UploadMode=default'
 
 & $cli compile --fqbn $fqbn --export-binaries 'D:\Macro Dash\firmware\MacroDeckUI'
 & $cli upload --port COM13 --fqbn $fqbn --input-dir 'D:\Macro Dash\firmware\MacroDeckUI\build\esp32.esp32.waveshare_esp32_s3_touch_lcd_7'
@@ -33,5 +33,8 @@ Board begin success
 Macro Deck UI ready
 ```
 
-Touching a control prints its action name and numeric action ID. USB HID is not
-enabled in this UI milestone.
+Touching an Orca Slicer control prints its action and sends its mapped shortcut
+through the ESP32-S3 native USB connector as a USB HID keyboard. Keep the
+USB-UART connector attached for flashing/debugging and connect native USB to
+the Windows PC for macro output. Firmware drives CH422G `EXIO5` low during
+startup because the native USB data lines are shared with CAN on this board.
