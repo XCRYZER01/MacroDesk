@@ -1,0 +1,15 @@
+# Arduino build artifacts
+firmware/MacroDeckUI/build/
+*.bin
+*.elf
+*.map
+
+# Temporary conversion/calibration sources
+*.disabled
+
+# Editor and OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.log
