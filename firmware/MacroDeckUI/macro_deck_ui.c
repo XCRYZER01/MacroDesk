@@ -46,6 +46,15 @@ static lv_obj_t *s_fusion_hotspots;
 static lv_obj_t *s_orca_hotspots;
 static lv_obj_t *s_jog_pad;
 static lv_obj_t *s_jog_step_label;
+static lv_obj_t *s_settings_step_label;
+/* Orca sidebar pages, indexed by sidebar position. [0] Prepare is the image grid itself.
+ * Only the open page exists: pages are built on demand to stay inside LV_MEM_SIZE. */
+#define ORCA_PAGE_COUNT 8
+static lv_obj_t *s_orca_pages_parent;
+static lv_obj_t *s_orca_page;
+static lv_obj_t *s_nav_marker;
+static lv_obj_t *s_fusion_pages_parent;
+static lv_obj_t *s_fusion_nav_marker;
 static bool s_jog_fine;
 static macro_action_t s_profile = MACRO_ACTION_PROFILE_FUSION;
 
@@ -61,6 +70,10 @@ static bool s_styles_ready;
 static void load_reference_image(const uint16_t *source_pixels);
 static void set_active_profile(macro_action_t profile);
 static void build_jog_pad(lv_obj_t *parent);
+static void build_orca_pages(lv_obj_t *parent);
+static void show_orca_page(size_t index);
+static void build_fusion_pages(lv_obj_t *parent);
+static void show_fusion_page(size_t index);
 
 static const action_spec_t s_main_actions[] = {
     {LV_SYMBOL_FILE, "New Design", "Ctrl + N", MACRO_ACTION_NEW_DESIGN, 0xB8D8FF},
@@ -174,13 +187,20 @@ static void action_event_cb(lv_event_t *event)
         lv_obj_add_flag(s_jog_pad, LV_OBJ_FLAG_HIDDEN);
     }
 
+    if (spec->action >= MACRO_ACTION_NAV_HOME && spec->action <= MACRO_ACTION_NAV_SETTINGS) {
+        show_fusion_page((size_t)(spec->action - MACRO_ACTION_NAV_HOME));
+    }
+    if (spec->action >= MACRO_ACTION_ORCA_PREPARE && spec->action <= MACRO_ACTION_ORCA_SETTINGS) {
+        show_orca_page((size_t)(spec->action - MACRO_ACTION_ORCA_PREPARE));
+    }
+
     macro_action_t action = spec->action;
     if (action == MACRO_ACTION_JOG_STEP_FINE || action == MACRO_ACTION_JOG_STEP_COARSE) {
         s_jog_fine = !s_jog_fine;
         action = s_jog_fine ? MACRO_ACTION_JOG_STEP_FINE : MACRO_ACTION_JOG_STEP_COARSE;
-        if (s_jog_step_label != NULL) {
-            lv_label_set_text(s_jog_step_label, s_jog_fine ? "1 mm" : "10 mm");
-        }
+        const char *step_text = s_jog_fine ? "1 mm" : "10 mm";
+        if (s_jog_step_label != NULL) lv_label_set_text(s_jog_step_label, step_text);
+        if (s_settings_step_label != NULL) lv_label_set_text(s_settings_step_label, step_text);
     }
 
     if (s_action_cb != NULL) {
@@ -209,9 +229,9 @@ static void build_reference_ui(lv_obj_t *parent)
     static const action_spec_t view_actions[] = {
         {LV_SYMBOL_HOME, "Home", "", MACRO_ACTION_VIEW_HOME, 0xBED4F7},
         {LV_SYMBOL_IMAGE, "Fit", "", MACRO_ACTION_VIEW_FIT, 0xBED4F7},
-        {LV_SYMBOL_PLUS, "Zoom", "", MACRO_ACTION_VIEW_ZOOM, 0xBED4F7},
-        {LV_SYMBOL_UP, "Pan", "", MACRO_ACTION_VIEW_PAN, 0xBED4F7},
-        {LV_SYMBOL_REFRESH, "Orbit", "", MACRO_ACTION_VIEW_ORBIT, 0xBED4F7},
+        {LV_SYMBOL_EYE_OPEN, "Visibility", "V", MACRO_ACTION_FUSION_VISIBILITY, 0xBED4F7},
+        {LV_SYMBOL_NEW_LINE, "Full Screen", "Ctrl + Shift + F", MACRO_ACTION_FUSION_FULLSCREEN, 0xBED4F7},
+        {LV_SYMBOL_LIST, "4 Views", "Shift + 1", MACRO_ACTION_FUSION_VIEWPORTS, 0xBED4F7},
     };
     static const action_spec_t display_actions[] = {
         {LV_SYMBOL_IMAGE, "Shaded", "", MACRO_ACTION_DISPLAY_SHADED, 0x69B3FF},
@@ -267,6 +287,11 @@ static void build_reference_ui(lv_obj_t *parent)
     make_hotspot(s_fusion_hotspots, &profile_actions[0], 78, 432, 128, 40);
     make_hotspot(s_fusion_hotspots, &profile_actions[1], 208, 432, 128, 40);
     make_hotspot(s_fusion_hotspots, &profile_actions[2], 337, 432, 118, 40);
+
+    /* ACTIVE WORKSPACE box: Ctrl+] steps to the next Fusion workspace. */
+    static const action_spec_t fusion_workspace = {"W", "Next Workspace", "Ctrl + ]", MACRO_ACTION_FUSION_NEXT_WORKSPACE, COLOR_ORANGE};
+    make_hotspot(s_fusion_hotspots, &fusion_workspace, 620, 88, 168, 63);
+    build_fusion_pages(s_fusion_hotspots);
 
     static const action_spec_t orca_nav_actions[] = {
         {"P", "Prepare", "", MACRO_ACTION_ORCA_PREPARE, 0x24D4C1},
@@ -355,6 +380,7 @@ static void build_reference_ui(lv_obj_t *parent)
     make_hotspot(s_orca_hotspots, &orca_bottom_actions[1], 208, 432, 128, 40);
     make_hotspot(s_orca_hotspots, &orca_bottom_actions[2], 337, 432, 118, 40);
     make_hotspot(s_orca_hotspots, &orca_nav_actions[7], 744, 12, 44, 44);
+    build_orca_pages(s_orca_hotspots);
     lv_obj_add_flag(s_orca_hotspots, LV_OBJ_FLAG_HIDDEN);
 
     build_jog_pad(parent);
@@ -430,6 +456,304 @@ static void build_jog_pad(lv_obj_t *parent)
     lv_obj_add_flag(s_jog_pad, LV_OBJ_FLAG_HIDDEN);
 }
 
+typedef struct {
+    const char *title;
+    const char *hint;
+    const action_spec_t *items;
+    uint8_t count;
+    uint8_t cols;
+} orca_page_def_t;
+
+/* Returns the icon label so callers can turn it into a live value. */
+static lv_obj_t *make_page_button(lv_obj_t *parent, const action_spec_t *spec,
+                                  lv_coord_t x, lv_coord_t y, lv_coord_t w, lv_coord_t h)
+{
+    lv_obj_t *button = lv_btn_create(parent);
+    lv_obj_remove_style_all(button);
+    lv_obj_set_pos(button, x, y);
+    lv_obj_set_size(button, w, h);
+    lv_obj_set_style_radius(button, 8, 0);
+    lv_obj_set_style_bg_color(button, C_HEX(0x0E191E), 0);
+    lv_obj_set_style_bg_opa(button, LV_OPA_COVER, 0);
+    lv_obj_set_style_border_color(button, C_HEX(0x1D2B34), 0);
+    lv_obj_set_style_border_width(button, 1, 0);
+    lv_obj_set_style_bg_color(button, C_HEX(COLOR_BLUE), LV_STATE_PRESSED);
+    lv_obj_set_style_bg_opa(button, LV_OPA_40, LV_STATE_PRESSED);
+    lv_obj_set_style_border_color(button, C_HEX(0xC8E5FF), LV_STATE_PRESSED);
+    lv_obj_add_event_cb(button, action_event_cb, LV_EVENT_CLICKED, (void *)spec);
+
+    lv_obj_t *icon = make_label(button, spec->icon, &lv_font_montserrat_26, spec->accent);
+    lv_obj_align(icon, LV_ALIGN_TOP_MID, 0, h >= 84 ? 12 : 6);
+    lv_obj_t *label = make_label(button, spec->label, &lv_font_montserrat_14, COLOR_TEXT);
+    lv_obj_align(label, LV_ALIGN_BOTTOM_MID, 0, -24);
+    lv_obj_t *shortcut = make_label(button, spec->shortcut, &lv_font_montserrat_12, COLOR_MUTED);
+    lv_obj_align(shortcut, LV_ALIGN_BOTTOM_MID, 0, -7);
+    return icon;
+}
+
+static lv_obj_t *build_orca_page(lv_obj_t *parent, const orca_page_def_t *def)
+{
+    /* Covers the image grid (and blocks its hotspots) while the page is open. */
+    lv_obj_t *page = lv_obj_create(parent);
+    lv_obj_remove_style_all(page);
+    lv_obj_set_pos(page, 131, 84);
+    lv_obj_set_size(page, 486, 344);
+    lv_obj_set_style_bg_color(page, C_HEX(0x010408), 0);
+    lv_obj_set_style_bg_opa(page, LV_OPA_COVER, 0);
+    lv_obj_clear_flag(page, LV_OBJ_FLAG_SCROLLABLE);
+
+    lv_obj_t *title = make_label(page, def->title, &lv_font_montserrat_16, 0xE6F2FF);
+    lv_obj_set_pos(title, 8, 6);
+    lv_obj_t *hint = make_label(page, def->hint, &lv_font_montserrat_12, COLOR_MUTED);
+    lv_obj_set_pos(hint, 8, 28);
+
+    const lv_coord_t gap = 8;
+    const lv_coord_t top = 50;
+    const uint8_t rows = (uint8_t)((def->count + def->cols - 1) / def->cols);
+    const lv_coord_t w = (lv_coord_t)((474 - (def->cols - 1) * gap) / def->cols);
+    lv_coord_t h = (lv_coord_t)((288 - (rows - 1) * gap) / rows);
+    if (h > 100) h = 100;
+
+    for (uint8_t i = 0; i < def->count; ++i) {
+        const lv_coord_t col = (lv_coord_t)(i % def->cols);
+        const lv_coord_t row = (lv_coord_t)(i / def->cols);
+        lv_obj_t *icon = make_page_button(page, &def->items[i],
+                                          6 + col * (w + gap), top + row * (h + gap), w, h);
+        if (def->items[i].action == MACRO_ACTION_JOG_STEP_COARSE) {
+            s_settings_step_label = icon;
+            lv_label_set_text(icon, s_jog_fine ? "1 mm" : "10 mm");
+        }
+    }
+
+    return page;
+}
+
+static const orca_page_def_t *orca_page_def(size_t index)
+{
+    static const action_spec_t modify_items[] = {
+        {LV_SYMBOL_COPY, "Clone", "Ctrl + K", MACRO_ACTION_ORCA_CLONE, 0x55BFFF},
+        {LV_SYMBOL_PLUS, "Instance +", "+", MACRO_ACTION_ORCA_INSTANCE_ADD, 0x30E57B},
+        {LV_SYMBOL_MINUS, "Instance -", "-", MACRO_ACTION_ORCA_INSTANCE_REMOVE, 0xFF5964},
+        {"B", "Mesh Boolean", "B", MACRO_ACTION_ORCA_MESH_BOOLEAN, 0x55BFFF},
+        {"Y", "Assembly", "Y", MACRO_ACTION_ORCA_ASSEMBLY, 0x55BFFF},
+        {LV_SYMBOL_EYE_OPEN, "Printable", "V", MACRO_ACTION_ORCA_TOGGLE_PRINTABLE, 0x8BE0FF},
+        {LV_SYMBOL_OK, "Select All", "Ctrl + A", MACRO_ACTION_ORCA_SELECT_ALL, 0x30E57B},
+        {LV_SYMBOL_CLOSE, "Deselect", "Esc", MACRO_ACTION_ORCA_DESELECT, 0xAEB8C6},
+        {LV_SYMBOL_COPY, "Copy", "Ctrl + C", MACRO_ACTION_ORCA_COPY, 0xBED4F7},
+        {LV_SYMBOL_PASTE, "Paste", "Ctrl + V", MACRO_ACTION_ORCA_PASTE, 0xBED4F7},
+        {LV_SYMBOL_CUT, "Cut", "Ctrl + X", MACRO_ACTION_ORCA_CUT_CLIPBOARD, 0xBED4F7},
+        {LV_SYMBOL_TRASH, "Delete All", "Ctrl + D", MACRO_ACTION_ORCA_DELETE_ALL, 0xFF5964},
+    };
+    static const action_spec_t view_items[] = {
+        {LV_SYMBOL_PLUS, "Zoom In", "I", MACRO_ACTION_ORCA_ZOOM_IN, 0xBED4F7},
+        {LV_SYMBOL_MINUS, "Zoom Out", "O", MACRO_ACTION_ORCA_ZOOM_OUT, 0xBED4F7},
+        {LV_SYMBOL_BARS, "Sidebar", "Shift + Tab", MACRO_ACTION_ORCA_TOGGLE_SIDEBAR, 0xBED4F7},
+        {LV_SYMBOL_SHUFFLE, "Prep / Preview", "Tab", MACRO_ACTION_ORCA_VIEW_PREVIEW, 0x24D4C1},
+        {LV_SYMBOL_LIST, "One Layer", "Preview: L", MACRO_ACTION_ORCA_ONE_LAYER, 0xFFAA2A},
+        {LV_SYMBOL_FILE, "G-code", "Preview: C", MACRO_ACTION_ORCA_GCODE_WINDOW, 0xFFAA2A},
+        {LV_SYMBOL_UP, "Layer Up", "Preview: Up", MACRO_ACTION_ORCA_SLIDER_UP, 0xFFAA2A},
+        {LV_SYMBOL_DOWN, "Layer Down", "Preview: Down", MACRO_ACTION_ORCA_SLIDER_DOWN, 0xFFAA2A},
+        {LV_SYMBOL_LEFT, "Move Back", "Preview: Left", MACRO_ACTION_ORCA_SLIDER_LEFT, 0xFFAA2A},
+        {LV_SYMBOL_RIGHT, "Move Fwd", "Preview: Right", MACRO_ACTION_ORCA_SLIDER_RIGHT, 0xFFAA2A},
+        {LV_SYMBOL_PREV, "Start", "Preview: Home", MACRO_ACTION_ORCA_SLIDER_HOME, 0xFFAA2A},
+        {LV_SYMBOL_NEXT, "End", "Preview: End", MACRO_ACTION_ORCA_SLIDER_END, 0xFFAA2A},
+    };
+    static const action_spec_t support_items[] = {
+        {LV_SYMBOL_EDIT, "Support Paint", "L", MACRO_ACTION_ORCA_SUPPORT_PAINTING, 0x8BE0FF},
+        {"E", "Brim Ears", "E", MACRO_ACTION_ORCA_BRIM_EARS, 0x8BE0FF},
+        {LV_SYMBOL_EDIT, "Seam Paint", "P", MACRO_ACTION_ORCA_SEAM_PAINTING, 0xA14CFF},
+        {"~", "Fuzzy Skin", "H", MACRO_ACTION_ORCA_FUZZY_SKIN, 0xA14CFF},
+    };
+    static const action_spec_t filament_items[] = {
+        {"1", "Filament 1", "1", MACRO_ACTION_ORCA_FILAMENT_1, 0xFF5964},
+        {"2", "Filament 2", "2", MACRO_ACTION_ORCA_FILAMENT_2, 0xFFAA2A},
+        {"3", "Filament 3", "3", MACRO_ACTION_ORCA_FILAMENT_3, 0xFFE14D},
+        {"4", "Filament 4", "4", MACRO_ACTION_ORCA_FILAMENT_4, 0x30E57B},
+        {"5", "Filament 5", "5", MACRO_ACTION_ORCA_FILAMENT_5, 0x24D4C1},
+        {"6", "Filament 6", "6", MACRO_ACTION_ORCA_FILAMENT_6, 0x55BFFF},
+        {"7", "Filament 7", "7", MACRO_ACTION_ORCA_FILAMENT_7, 0xA14CFF},
+        {"8", "Filament 8", "8", MACRO_ACTION_ORCA_FILAMENT_8, 0xFF7AC6},
+        {"9", "Filament 9", "9", MACRO_ACTION_ORCA_FILAMENT_9, 0xE6F2FF},
+        {LV_SYMBOL_TINT, "Color Paint", "N", MACRO_ACTION_ORCA_COLOR_PAINTING, 0x68B7FF},
+    };
+    static const action_spec_t printer_items[] = {
+        {LV_SYMBOL_UPLOAD, "Print Plate", "Ctrl + Shift + G", MACRO_ACTION_ORCA_PRINT_PLATE, 0x31C8F5},
+        {LV_SYMBOL_DOWNLOAD, "Export G-code", "Ctrl + G", MACRO_ACTION_ORCA_EXPORT_GCODE, 0x55BFFF},
+        {LV_SYMBOL_REFRESH, "Slice", "Ctrl + R", MACRO_ACTION_ORCA_SLICE, 0x30E57B},
+        {LV_SYMBOL_SAVE, "Save", "Ctrl + S", MACRO_ACTION_ORCA_SAVE_PROJECT, 0x55BFFF},
+        {LV_SYMBOL_SAVE, "Save As", "Ctrl + Shift + S", MACRO_ACTION_ORCA_SAVE_AS, 0x55BFFF},
+    };
+    static const action_spec_t tools_items[] = {
+        {"U", "Measure", "U", MACRO_ACTION_ORCA_MEASURE, 0x68B7FF},
+        {"Y", "Assembly", "Y", MACRO_ACTION_ORCA_ASSEMBLY, 0x55BFFF},
+        {"T", "Add Text", "T", MACRO_ACTION_ORCA_ADD_TEXT, 0x68B7FF},
+        {LV_SYMBOL_KEYBOARD, "Shortcuts", "?", MACRO_ACTION_ORCA_SHORTCUT_LIST, 0xBED4F7},
+        {LV_SYMBOL_GPS, "3Dconnexion", "Ctrl + M", MACRO_ACTION_ORCA_3DCONNEXION, 0xBED4F7},
+    };
+    static const action_spec_t settings_items[] = {
+        {LV_SYMBOL_SETTINGS, "Preferences", "Ctrl + P", MACRO_ACTION_ORCA_PREFERENCES, 0xBED4F7},
+        {LV_SYMBOL_LOOP, "Switch Tab", "Ctrl + Tab", MACRO_ACTION_ORCA_SWITCH_TAB, 0xBED4F7},
+        {"", "Jog Step", "deck setting", MACRO_ACTION_JOG_STEP_COARSE, 0x30E57B},
+    };
+    static const orca_page_def_t pages[ORCA_PAGE_COUNT] = {
+        {NULL, NULL, NULL, 0, 0},
+        {"MODIFY", "Select a model in Orca first", modify_items, 12, 4},
+        {"VIEW", "Orange = Preview only (in Prepare L / C / arrows do other things)",
+         view_items, 12, 4},
+        {"SUPPORT & PAINT", "Painting gizmos - select a model first", support_items, 4, 4},
+        {"FILAMENT", "Assigns a filament to the selected object or part", filament_items, 10, 5},
+        {"PRINTER", "Slice, export and print the active plate", printer_items, 5, 3},
+        {"TOOLS", "Gizmos and helpers", tools_items, 5, 3},
+        {"SETTINGS", "Orca settings and deck options", settings_items, 3, 3},
+    };
+
+    return index < ORCA_PAGE_COUNT ? &pages[index] : NULL;
+}
+
+static void build_orca_pages(lv_obj_t *parent)
+{
+    s_orca_pages_parent = parent;
+
+    /* The sidebar image has no selected row; this marker shows the open page. */
+    s_nav_marker = lv_obj_create(parent);
+    lv_obj_remove_style_all(s_nav_marker);
+    lv_obj_set_size(s_nav_marker, 121, 42);
+    lv_obj_set_pos(s_nav_marker, 5, 84);
+    lv_obj_set_style_radius(s_nav_marker, 9, 0);
+    lv_obj_set_style_bg_color(s_nav_marker, C_HEX(0x019C9E), 0);
+    lv_obj_set_style_bg_opa(s_nav_marker, LV_OPA_50, 0);
+    lv_obj_set_style_border_color(s_nav_marker, C_HEX(0x00E5D8), 0);
+    lv_obj_set_style_border_width(s_nav_marker, 2, 0);
+    lv_obj_clear_flag(s_nav_marker, LV_OBJ_FLAG_CLICKABLE);
+}
+
+static void close_page(void)
+{
+    if (s_orca_page != NULL) {
+        lv_obj_del(s_orca_page);
+        s_orca_page = NULL;
+        s_settings_step_label = NULL;
+    }
+}
+
+static void show_orca_page(size_t index)
+{
+    if (index >= ORCA_PAGE_COUNT) return;
+    close_page();
+    if (index > 0 && s_orca_pages_parent != NULL) {
+        s_orca_page = build_orca_page(s_orca_pages_parent, orca_page_def(index));
+    }
+    if (s_nav_marker != NULL) {
+        lv_obj_set_pos(s_nav_marker, 5, (lv_coord_t)(84 + index * 42));
+    }
+}
+
+/* Fusion commands marked "S search" have no default key: the firmware opens the
+ * S command search box, types the name and presses Enter. */
+static const orca_page_def_t *fusion_page_def(size_t index)
+{
+    static const action_spec_t sketch_items[] = {
+        {"L", "Line", "L", MACRO_ACTION_LINE, 0x3A9BFF},
+        {"R", "Rectangle", "R", MACRO_ACTION_RECTANGLE, 0x3A9BFF},
+        {"C", "Circle", "C", MACRO_ACTION_CIRCLE, 0x3A9BFF},
+        {"A", "Arc", "S search", MACRO_ACTION_ARC, 0x8CC8FF},
+        {"D", "Dimension", "D", MACRO_ACTION_DIMENSION, 0xFF9138},
+        {"T", "Trim", "T", MACRO_ACTION_FUSION_TRIM, 0x3A9BFF},
+        {"O", "Offset", "O", MACRO_ACTION_FUSION_OFFSET, 0x3A9BFF},
+        {"P", "Project", "P", MACRO_ACTION_FUSION_PROJECT, 0x3A9BFF},
+        {"X", "Construction", "X", MACRO_ACTION_FUSION_CONSTRUCTION, 0xFFAA2A},
+        {"F", "Sketch Fillet", "S search", MACRO_ACTION_FUSION_SKETCH_FILLET, 0x8CC8FF},
+    };
+    static const action_spec_t solid_items[] = {
+        {"E", "Extrude", "E", MACRO_ACTION_EXTRUDE, 0x55A9FF},
+        {"Q", "Press Pull", "Q", MACRO_ACTION_FUSION_PRESS_PULL, 0x55A9FF},
+        {"F", "Fillet", "F", MACRO_ACTION_FILLET, 0x5AAEFF},
+        {"H", "Hole", "H", MACRO_ACTION_HOLE, 0x82BFFF},
+        {"M", "Move", "M", MACRO_ACTION_MOVE, 0xFF9138},
+        {"J", "Joint", "J", MACRO_ACTION_FUSION_JOINT, 0xFF9138},
+        {LV_SYMBOL_REFRESH, "Revolve", "S search", MACRO_ACTION_REVOLVE, 0x8CC8FF},
+        {"/", "Chamfer", "S search", MACRO_ACTION_CHAMFER, 0x8CC8FF},
+        {"[]", "Shell", "S search", MACRO_ACTION_SHELL, 0x8CC8FF},
+        {"+", "Combine", "S search", MACRO_ACTION_COMBINE, 0x8CC8FF},
+        {"::", "Pattern", "S search", MACRO_ACTION_PATTERN, 0x8CC8FF},
+        {"|", "Mirror", "S search", MACRO_ACTION_MIRROR, 0x8CC8FF},
+    };
+    static const action_spec_t surface_items[] = {
+        {"~", "Patch", "S search", MACRO_ACTION_FUSION_PATCH, 0x8CC8FF},
+        {"+", "Stitch", "S search", MACRO_ACTION_FUSION_STITCH, 0x8CC8FF},
+        {"-", "Unstitch", "S search", MACRO_ACTION_FUSION_UNSTITCH, 0x8CC8FF},
+        {"=", "Thicken", "S search", MACRO_ACTION_FUSION_THICKEN, 0x8CC8FF},
+        {LV_SYMBOL_CUT, "Trim", "S search", MACRO_ACTION_FUSION_SURFACE_TRIM, 0x8CC8FF},
+    };
+    static const action_spec_t mesh_items[] = {
+        {LV_SYMBOL_DOWNLOAD, "Insert Mesh", "S search", MACRO_ACTION_FUSION_INSERT_MESH, 0x8CC8FF},
+        {LV_SYMBOL_SHUFFLE, "Convert Mesh", "S search", MACRO_ACTION_FUSION_CONVERT_MESH, 0x8CC8FF},
+        {LV_SYMBOL_MINUS, "Reduce", "S search", MACRO_ACTION_FUSION_REDUCE, 0x8CC8FF},
+        {LV_SYMBOL_REFRESH, "Remesh", "S search", MACRO_ACTION_FUSION_REMESH, 0x8CC8FF},
+    };
+    static const action_spec_t sheet_items[] = {
+        {"L", "Flange", "S search", MACRO_ACTION_FUSION_FLANGE, 0x8CC8FF},
+        {LV_SYMBOL_RIGHT, "Unfold", "S search", MACRO_ACTION_FUSION_UNFOLD, 0x8CC8FF},
+        {LV_SYMBOL_LEFT, "Refold", "S search", MACRO_ACTION_FUSION_REFOLD, 0x8CC8FF},
+        {"[]", "Flat Pattern", "S search", MACRO_ACTION_FUSION_FLAT_PATTERN, 0x8CC8FF},
+        {LV_SYMBOL_LIST, "Rules", "S search", MACRO_ACTION_FUSION_SHEET_RULES, 0x8CC8FF},
+    };
+    static const action_spec_t tools_items[] = {
+        {"I", "Measure", "I", MACRO_ACTION_FUSION_MEASURE, 0x68B7FF},
+        {"A", "Appearance", "A", MACRO_ACTION_FUSION_APPEARANCE, 0xFF9138},
+        {LV_SYMBOL_EYE_OPEN, "Visibility", "V", MACRO_ACTION_FUSION_VISIBILITY, 0xBED4F7},
+        {LV_SYMBOL_LOOP, "Repeat Last", "Space", MACRO_ACTION_FUSION_REPEAT, 0x30E57B},
+        {"|", "Section", "S search", MACRO_ACTION_FUSION_SECTION, 0x8CC8FF},
+        {LV_SYMBOL_WARNING, "Interference", "S search", MACRO_ACTION_FUSION_INTERFERENCE, 0x8CC8FF},
+    };
+    static const action_spec_t settings_items[] = {
+        {LV_SYMBOL_LIST, "Browser", "Ctrl + Alt + B", MACRO_ACTION_FUSION_BROWSER, 0xBED4F7},
+        {LV_SYMBOL_DIRECTORY, "Data Panel", "Ctrl + Alt + P", MACRO_ACTION_FUSION_DATA_PANEL, 0xBED4F7},
+        {LV_SYMBOL_IMAGE, "ViewCube", "Ctrl + Alt + V", MACRO_ACTION_FUSION_VIEWCUBE, 0xBED4F7},
+        {LV_SYMBOL_NEW_LINE, "Full Screen", "Ctrl + Shift + F", MACRO_ACTION_FUSION_FULLSCREEN, 0xBED4F7},
+        {LV_SYMBOL_REFRESH, "Reset Layout", "Ctrl + Alt + R", MACRO_ACTION_FUSION_RESET_LAYOUT, 0xFFAA2A},
+        {"4", "4 Views", "Shift + 1", MACRO_ACTION_FUSION_VIEWPORTS, 0xBED4F7},
+    };
+    static const orca_page_def_t pages[ORCA_PAGE_COUNT] = {
+        {NULL, NULL, NULL, 0, 0},
+        {"SKETCH", "Open a sketch first - light blue = S search (English UI)", sketch_items, 10, 5},
+        {"SOLID", "Light blue = S search (English UI)", solid_items, 12, 4},
+        {"SURFACE", "All via S search (English UI)", surface_items, 5, 3},
+        {"MESH", "All via S search (English UI)", mesh_items, 4, 4},
+        {"SHEET METAL", "All via S search (English UI)", sheet_items, 5, 3},
+        {"TOOLS", "Inspect and display helpers", tools_items, 6, 3},
+        {"SETTINGS", "Fusion window layout", settings_items, 6, 3},
+    };
+    return index < ORCA_PAGE_COUNT ? &pages[index] : NULL;
+}
+
+static void show_fusion_page(size_t index)
+{
+    if (index >= ORCA_PAGE_COUNT) return;
+    close_page();
+    if (index > 0 && s_fusion_pages_parent != NULL) {
+        s_orca_page = build_orca_page(s_fusion_pages_parent, fusion_page_def(index));
+    }
+    if (s_fusion_nav_marker != NULL) {
+        lv_obj_set_pos(s_fusion_nav_marker, 5, (lv_coord_t)(84 + index * 42));
+    }
+}
+
+static void build_fusion_pages(lv_obj_t *parent)
+{
+    s_fusion_pages_parent = parent;
+    s_fusion_nav_marker = lv_obj_create(parent);
+    lv_obj_remove_style_all(s_fusion_nav_marker);
+    lv_obj_set_size(s_fusion_nav_marker, 121, 42);
+    lv_obj_set_pos(s_fusion_nav_marker, 5, 84);
+    lv_obj_set_style_radius(s_fusion_nav_marker, 9, 0);
+    lv_obj_set_style_bg_color(s_fusion_nav_marker, C_HEX(0xCB5B18), 0);
+    lv_obj_set_style_bg_opa(s_fusion_nav_marker, LV_OPA_50, 0);
+    lv_obj_set_style_border_color(s_fusion_nav_marker, C_HEX(COLOR_ORANGE), 0);
+    lv_obj_set_style_border_width(s_fusion_nav_marker, 2, 0);
+    lv_obj_clear_flag(s_fusion_nav_marker, LV_OBJ_FLAG_CLICKABLE);
+}
+
 static void load_reference_image(const uint16_t *source_pixels)
 {
     if (s_reference_pixels == NULL || source_pixels == NULL) return;
@@ -442,6 +766,8 @@ static void set_active_profile(macro_action_t profile)
     if (s_fusion_hotspots == NULL || s_orca_hotspots == NULL) return;
     s_profile = profile;
     if (s_jog_pad != NULL) lv_obj_add_flag(s_jog_pad, LV_OBJ_FLAG_HIDDEN);
+    show_orca_page(0);
+    show_fusion_page(0);
     if (profile == MACRO_ACTION_PROFILE_ORCA) {
         load_reference_image(ui_orca_rgb565);
         lv_obj_add_flag(s_fusion_hotspots, LV_OBJ_FLAG_HIDDEN);
@@ -603,9 +929,9 @@ static void build_right_panel(lv_obj_t *parent)
     static const action_spec_t view_actions[] = {
         {LV_SYMBOL_HOME, "Home", "", MACRO_ACTION_VIEW_HOME, 0xBED4F7},
         {LV_SYMBOL_IMAGE, "Fit", "", MACRO_ACTION_VIEW_FIT, 0xBED4F7},
-        {LV_SYMBOL_PLUS, "Zoom", "", MACRO_ACTION_VIEW_ZOOM, 0xBED4F7},
-        {LV_SYMBOL_UP, "Pan", "", MACRO_ACTION_VIEW_PAN, 0xBED4F7},
-        {LV_SYMBOL_REFRESH, "Orbit", "", MACRO_ACTION_VIEW_ORBIT, 0xBED4F7},
+        {LV_SYMBOL_EYE_OPEN, "Visibility", "V", MACRO_ACTION_FUSION_VISIBILITY, 0xBED4F7},
+        {LV_SYMBOL_NEW_LINE, "Full Screen", "Ctrl + Shift + F", MACRO_ACTION_FUSION_FULLSCREEN, 0xBED4F7},
+        {LV_SYMBOL_LIST, "4 Views", "Shift + 1", MACRO_ACTION_FUSION_VIEWPORTS, 0xBED4F7},
     };
     static const action_spec_t display_actions[] = {
         {LV_SYMBOL_IMAGE, "Shaded", "", MACRO_ACTION_DISPLAY_SHADED, 0x69B3FF},

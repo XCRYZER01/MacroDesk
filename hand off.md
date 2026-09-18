@@ -19,6 +19,7 @@ Repository: <https://github.com/XCRYZER01/MacroDesk>
 - กล่อง VIEW กับ DISPLAY ยุบรวมเป็นกล่องเดียว จัดเป็น 3 × 3 ใส่ปุ่มมุมมอง 8 ปุ่ม (Default, Top, Bottom, Front, Behind, Left, Right, Preview) hotspot วางตรงกับช่องที่วาดพอดี
 - หน้า Fusion 360 ยังเป็น grid 5 × 4 แบบเดิม
 - Header, sidebar, right panel และ bottom app bar อยู่พิกัดเดียวกันทั้งสองหน้า
+- ลบวันที่และเวลาออกจากหัวจอทั้งสองหน้าแล้ว (เดิมเป็นตัวหนังสือในภาพ ไม่เคยเดิน) และลบไอคอน Wi-Fi ด้วย (บอร์ดไม่ได้ต่อ Wi-Fi จริง) เหลือแค่คำขวัญ ถ้าจะทำนาฬิกาจริง ต้องมีแหล่งเวลา: Wi-Fi + NTP (ไม่ต้องลงอะไรที่ PC) หรือ USB CDC + สคริปต์ฝั่ง PC
 - แถบล่างเหลือ Fusion 360, Orca Slicer และ System (ลบ Bambu Studio ออกแล้ว System อยู่ x 337–454)
 - แตะ `Orca Slicer` หรือ `Fusion 360` ที่แถบล่างเพื่อเปลี่ยนโปรไฟล์
 - แตะปุ่ม `Move` บนหน้า Orca จะส่ง `M` แล้วเด้ง jog pad ขึ้นทับหน้าจอ (วาดด้วย LVGL ไม่ใช้ภาพ จึงไม่กินพื้นที่แฟลช) ปิดด้วยปุ่ม X มุมขวาบน หรือสลับโปรไฟล์
@@ -99,7 +100,65 @@ Right panel:
 
 ฟังก์ชันที่ OrcaSlicer ไม่มี shortcut จึงส่งจากบอร์ดไม่ได้ และตัดสินใจไม่ทำ: Add Plate, Split to Objects, Split to Parts, Variable Layer Height
 
-Sidebar ของ Orca เป็นหมวด UI ภายใน Control Deck และยังไม่ส่ง shortcut เพื่อป้องกันการเรียกคำสั่ง Orca ผิดรายการ
+## Fusion 360 HID mapping
+
+แหล่งอ้างอิง: Product Design Online (Fusion hotkeys), CAD Forum (Fusion shortcuts) และหน้า Autodesk shortcuts
+
+ตาราง 5 × 4 หน้าหลัก:
+
+| ปุ่ม | HID ที่ส่ง |
+|---|---|
+| New Design / Open / Save | Ctrl+N / Ctrl+O / Ctrl+S |
+| Undo / Redo | Ctrl+Z / Ctrl+Y |
+| Line / Rectangle / Circle / Dimension | L / R / C / D |
+| Extrude / Fillet / Move / Hole | E / F / M / H |
+| Arc, Revolve, Chamfer, Shell, Combine, Pattern, Mirror | S search (ป้ายในภาพแก้เป็น `S search` แล้ว) |
+
+S search = กด `S` เปิดช่องค้นหาคำสั่ง รอ 400 ms พิมพ์ชื่อคำสั่ง รอ 300 ms แล้วกด Enter ใช้ได้กับ Fusion ภาษาอังกฤษเท่านั้น ชื่อที่ใช้ค้นอยู่ใน `fusion_search_term()` ระหว่างส่ง UI ของบอร์ดจะค้างประมาณ 0.7 วินาที
+
+แถบขวา:
+
+| ปุ่ม | HID ที่ส่ง |
+|---|---|
+| ACTIVE WORKSPACE (กล่องทั้งกล่อง) | Ctrl+] สลับ workspace ถัดไป |
+| Home / Fit | ยังไม่ส่ง รอผู้ใช้ยืนยันปุ่ม (ป้าย Fit ในภาพเขียน `F` ซึ่งผิด เพราะ F คือ Fillet ต้องแก้ตอนยืนยันแล้ว) |
+| Visibility (แทน Zoom) | V |
+| Full Screen (แทน Pan) | Ctrl+Shift+F |
+| 4 Views (แทน Orbit) | Shift+1 |
+| Shaded / Hidden / Wireframe | Ctrl+4 / Ctrl+5 / Ctrl+7 (ป้ายในภาพแก้ให้ตรงแล้ว) |
+
+Sidebar หน้าย่อย (วาดด้วย LVGL แบบเดียวกับ Orca, ไฮไลต์ส้ม Home ในภาพถูกลบและใช้ `s_fusion_nav_marker` แทน):
+
+| หน้า | ปุ่ม |
+|---|---|
+| Home | ตาราง 5 × 4 หลัก |
+| Sketch | Line L, Rectangle R, Circle C, Arc (S), Dimension D, Trim T, Offset O, Project P, Construction X, Sketch Fillet (S) |
+| Solid | Extrude E, Press Pull Q, Fillet F, Hole H, Move M, Joint J, Revolve/Chamfer/Shell/Combine/Pattern/Mirror (S) |
+| Surface | Patch, Stitch, Unstitch, Thicken, Trim (S ทั้งหมด) |
+| Mesh | Insert Mesh, Convert Mesh, Reduce, Remesh (S ทั้งหมด) |
+| Sheet Metal | Flange, Unfold, Refold Faces, Create Flat Pattern, Sheet Metal Rules (S ทั้งหมด) |
+| Tools | Measure I, Appearance A, Visibility V, Repeat Last (Space), Section Analysis (S), Interference (S) |
+| Settings | Browser Ctrl+Alt+B, Data Panel Ctrl+Alt+P, ViewCube Ctrl+Alt+V, Full Screen Ctrl+Shift+F, Reset Layout Ctrl+Alt+R, 4 Views Shift+1 |
+
+## Sidebar หน้าย่อย (หน้า Orca)
+
+แตะ sidebar แล้วเปิดหน้าย่อยทับพื้นที่ตาราง (131, 84, 486 × 344) วาดด้วย LVGL และแตะ Prepare เพื่อกลับตารางหลัก ไอคอนเฟืองมุมขวาบนเปิดหน้า Settings
+
+| หน้า | ปุ่ม (HID) |
+|---|---|
+| Prepare | ตาราง 6 × 4 หลัก (ภาพพื้นหลัง) |
+| Modify | Clone Ctrl+K, Instance + `+`, Instance − `-`, Mesh Boolean B, Assembly Y, Printable V, Select All Ctrl+A, Deselect Esc, Copy Ctrl+C, Paste Ctrl+V, Cut Ctrl+X, Delete All Ctrl+D |
+| View | Zoom In I, Zoom Out O, Sidebar Shift+Tab, Prep/Preview Tab และปุ่มสีส้มที่ใช้ได้เฉพาะใน Preview: One Layer L, G-code C, Layer Up/Down, Move Back/Fwd (ลูกศร), Start Home, End End |
+| Support | Support Paint L, Brim Ears E, Seam Paint P, Fuzzy Skin H |
+| Filament | Filament 1–9 (กดเลข, เลข 1 Orca รอ 0.5 วินาทีก่อนใช้), Color Paint N |
+| Printer | Print Plate Ctrl+Shift+G, Export G-code Ctrl+G, Slice Ctrl+R, Save Ctrl+S, Save As Ctrl+Shift+S |
+| Tools | Measure U, Assembly Y, Add Text T, Shortcuts ?, 3Dconnexion Ctrl+M |
+| Settings | Preferences Ctrl+P, Switch Tab Ctrl+Tab, Jog Step (ตั้งค่าของบอร์ด ใช้ค่าเดียวกับ jog pad) |
+
+- ปุ่มสีส้มในหน้า View ถ้ากดตอนอยู่ Prepare จะไปเรียกคำสั่งอื่น (L = Support Paint, C = Cut, ลูกศร = ขยับชิ้นงาน)
+- `LV_MEM_SIZE` ของ LVGL มีแค่ 48 KB จึงสร้างหน้าย่อยตอนเปิดและลบหน้าเดิมทิ้ง ให้มีอยู่ในหน่วยความจำทีละหน้า วัดจริง: หน้า Modify/View ใช้ heap 81% (เหลือ 9.7 KB), Prepare 59% สลับไปมาหลายรอบแล้วค่าไม่เปลี่ยน ไม่มีหน่วยความจำรั่ว
+- ไฮไลต์ของ sidebar วาดด้วย LVGL (``s_nav_marker``) และย้ายตามหน้าที่เปิด ส่วนไฮไลต์ Prepare ที่เคยอยู่ในภาพถูกลบออกแล้ว
+- Serial จะพิมพ์ ``LVGL heap: …`` ทุกครั้งที่สลับหน้า ใช้ตรวจหน่วยความจำได้
 
 ## Jog pad
 
@@ -148,10 +207,10 @@ $fqbn = 'esp32:esp32:waveshare_esp32_s3_touch_lcd_7:PSRAM=enabled,FlashSize=16M,
 & $cli monitor --port COM13 --config baudrate=115200
 ```
 
-ผล compile ล่าสุด (2026-09-18, RGB565 + grid 6 × 4 + jog pad + Slice/Clone + กล่อง VIEW รวม):
+ผล compile ล่าสุด (2026-09-18, RGB565 + grid 6 × 4 + jog pad + Slice/Clone + กล่อง VIEW รวม + sidebar หน้าย่อย):
 
 ```text
-Sketch uses 2231057 bytes (70%) of program storage space.
+Sketch uses 2238725 bytes (71%) of program storage space.
 Global variables use 89352 bytes (27%) of dynamic memory.
 ```
 
@@ -165,11 +224,10 @@ Global variables use 89352 bytes (27%) of dynamic memory.
 
 ## งานถัดไป
 
-1. Implement HID mapping ของ Fusion 360 (ตอนนี้ `on_macro_action()` ส่ง shortcut เฉพาะตอนเลือกโปรไฟล์ Orca)
+1. Fusion: ยืนยันปุ่ม Home / Fit (ลอง F6) แล้วผูกและแก้ป้ายในภาพ และทดสอบปุ่ม S search กับ Fusion จริง
 2. สร้างหน้าโปรไฟล์ System
-3. สร้าง sub-page สำหรับ sidebar ของ Orca
-4. หมุน/ย่อขยาย/ขยับแกน Z จากจอ (ต้องเพิ่ม HID Mouse หรือโปรแกรมฝั่ง PC)
-5. ใช้ช่องว่างที่เหลือ 1 ช่องในตาราง Orca
+3. หมุน/ย่อขยาย/ขยับแกน Z จากจอ (ต้องเพิ่ม HID Mouse หรือโปรแกรมฝั่ง PC)
+4. ใช้ช่องว่างที่เหลือ 1 ช่องในตาราง Orca
 
 ## สถานะปัจจุบัน
 
@@ -180,9 +238,9 @@ Global variables use 89352 bytes (27%) of dynamic memory.
 - ใช้งานจริงต้องเสียบช่อง Native USB (ส่ง HID) ส่วนช่อง UART ใช้แฟลชและดู log เท่านั้น เสียบทั้งสองช่องพร้อมกันได้
 - Native USB mux fix (`EXIO5 LOW`): implement แล้วและใช้งานได้
 - COM13: USB-Enhanced-SERIAL CH343
-- Fusion 360 UI: สลับหน้าได้ แต่ HID mapping ของ Fusion ยังไม่ได้ implement ครบ
+- Fusion 360: ผูกปุ่มครบทุกหน้าแล้ว (2026-09-18) ทดสอบการแตะผ่าน Serial ผ่านทุกปุ่ม ยังไม่ได้ทดสอบกับโปรแกรม Fusion จริง และ Home / Fit ยังรอยืนยัน
 - System: มีปุ่มใน bottom bar แต่ยังไม่มีหน้า profile
-- Sidebar Orca: touch callback มีแล้ว แต่ยังไม่มีหน้า sub-page
+- Sidebar Orca: ครบทั้ง 8 หน้า แฟลชและทดสอบสลับหน้าแล้ว (2026-09-18)
 - ไอคอนใหม่ 6 ตัว (Instance ±, Support, Fuzzy Skin, Color, Measure) วาดขึ้นเองด้วย SVG แล้วเรนเดอร์ด้วย Edge headless ไม่ได้นำไอคอนของ OrcaSlicer มาใช้ เพื่อเลี่ยงเงื่อนไขสัญญาอนุญาต AGPL
 
 ## Git

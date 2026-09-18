@@ -54,6 +54,12 @@ static void hid_jog(uint8_t arrow)
 
 static void send_orca_shortcut(macro_action_t action)
 {
+    /* Orca: keys 1-9 set the filament of the selected object/part ("1" applies after 0.5 s). */
+    if (action >= MACRO_ACTION_ORCA_FILAMENT_1 && action <= MACRO_ACTION_ORCA_FILAMENT_9) {
+        hid_tap('1' + (action - MACRO_ACTION_ORCA_FILAMENT_1));
+        return;
+    }
+
     switch (action) {
         case MACRO_ACTION_ORCA_NEW_PROJECT: hid_combo(KEY_LEFT_CTRL, 'n'); break;
         case MACRO_ACTION_ORCA_OPEN_PROJECT: hid_combo(KEY_LEFT_CTRL, 'o'); break;
@@ -80,6 +86,36 @@ static void send_orca_shortcut(macro_action_t action)
         case MACRO_ACTION_ORCA_COLOR_PAINTING: hid_tap('n'); break;
         case MACRO_ACTION_ORCA_MEASURE: hid_tap('u'); break;
 
+        /* Sidebar sub-pages. */
+        case MACRO_ACTION_ORCA_MESH_BOOLEAN: hid_tap('b'); break;
+        case MACRO_ACTION_ORCA_ASSEMBLY: hid_tap('y'); break;
+        case MACRO_ACTION_ORCA_TOGGLE_PRINTABLE: hid_tap('v'); break;
+        case MACRO_ACTION_ORCA_SELECT_ALL: hid_combo(KEY_LEFT_CTRL, 'a'); break;
+        case MACRO_ACTION_ORCA_DESELECT: hid_tap(KEY_ESC); break;
+        case MACRO_ACTION_ORCA_COPY: hid_combo(KEY_LEFT_CTRL, 'c'); break;
+        case MACRO_ACTION_ORCA_PASTE: hid_combo(KEY_LEFT_CTRL, 'v'); break;
+        case MACRO_ACTION_ORCA_CUT_CLIPBOARD: hid_combo(KEY_LEFT_CTRL, 'x'); break;
+        case MACRO_ACTION_ORCA_DELETE_ALL: hid_combo(KEY_LEFT_CTRL, 'd'); break;
+        case MACRO_ACTION_ORCA_BRIM_EARS: hid_tap('e'); break;
+        case MACRO_ACTION_ORCA_ZOOM_IN: hid_tap('i'); break;
+        case MACRO_ACTION_ORCA_ZOOM_OUT: hid_tap('o'); break;
+        case MACRO_ACTION_ORCA_TOGGLE_SIDEBAR: hid_combo(KEY_LEFT_SHIFT, KEY_TAB); break;
+        case MACRO_ACTION_ORCA_ONE_LAYER: hid_tap('l'); break;
+        case MACRO_ACTION_ORCA_GCODE_WINDOW: hid_tap('c'); break;
+        case MACRO_ACTION_ORCA_SLIDER_UP: hid_tap(KEY_UP_ARROW); break;
+        case MACRO_ACTION_ORCA_SLIDER_DOWN: hid_tap(KEY_DOWN_ARROW); break;
+        case MACRO_ACTION_ORCA_SLIDER_LEFT: hid_tap(KEY_LEFT_ARROW); break;
+        case MACRO_ACTION_ORCA_SLIDER_RIGHT: hid_tap(KEY_RIGHT_ARROW); break;
+        case MACRO_ACTION_ORCA_SLIDER_HOME: hid_tap(KEY_HOME); break;
+        case MACRO_ACTION_ORCA_SLIDER_END: hid_tap(KEY_END); break;
+        case MACRO_ACTION_ORCA_PRINT_PLATE: hid_combo3(KEY_LEFT_CTRL, KEY_LEFT_SHIFT, 'g'); break;
+        case MACRO_ACTION_ORCA_EXPORT_GCODE: hid_combo(KEY_LEFT_CTRL, 'g'); break;
+        case MACRO_ACTION_ORCA_SAVE_AS: hid_combo3(KEY_LEFT_CTRL, KEY_LEFT_SHIFT, 's'); break;
+        case MACRO_ACTION_ORCA_SHORTCUT_LIST: hid_tap('?'); break;
+        case MACRO_ACTION_ORCA_3DCONNEXION: hid_combo(KEY_LEFT_CTRL, 'm'); break;
+        case MACRO_ACTION_ORCA_PREFERENCES: hid_combo(KEY_LEFT_CTRL, 'p'); break;
+        case MACRO_ACTION_ORCA_SWITCH_TAB: hid_combo(KEY_LEFT_CTRL, KEY_TAB); break;
+
         case MACRO_ACTION_ORCA_VIEW_DEFAULT: hid_combo(KEY_LEFT_CTRL, '0'); break;
         case MACRO_ACTION_ORCA_VIEW_TOP: hid_combo(KEY_LEFT_CTRL, '1'); break;
         case MACRO_ACTION_ORCA_VIEW_BOTTOM: hid_combo(KEY_LEFT_CTRL, '2'); break;
@@ -97,6 +133,101 @@ static void send_orca_shortcut(macro_action_t action)
         case MACRO_ACTION_JOG_STEP_FINE: s_jog_fine = true; break;
         case MACRO_ACTION_JOG_STEP_COARSE: s_jog_fine = false; break;
         case MACRO_ACTION_JOG_CLOSE: break;
+        default: break;
+    }
+}
+
+/* Fusion commands with no default key, run through the S command search box.
+ * The names match Fusion's English UI. */
+static const char *fusion_search_term(macro_action_t action)
+{
+    switch (action) {
+        case MACRO_ACTION_ARC: return "3-Point Arc";
+        case MACRO_ACTION_REVOLVE: return "Revolve";
+        case MACRO_ACTION_CHAMFER: return "Chamfer";
+        case MACRO_ACTION_SHELL: return "Shell";
+        case MACRO_ACTION_COMBINE: return "Combine";
+        case MACRO_ACTION_PATTERN: return "Rectangular Pattern";
+        case MACRO_ACTION_MIRROR: return "Mirror";
+        case MACRO_ACTION_FUSION_SKETCH_FILLET: return "Fillet";
+        case MACRO_ACTION_FUSION_PATCH: return "Patch";
+        case MACRO_ACTION_FUSION_STITCH: return "Stitch";
+        case MACRO_ACTION_FUSION_UNSTITCH: return "Unstitch";
+        case MACRO_ACTION_FUSION_THICKEN: return "Thicken";
+        case MACRO_ACTION_FUSION_SURFACE_TRIM: return "Trim";
+        case MACRO_ACTION_FUSION_INSERT_MESH: return "Insert Mesh";
+        case MACRO_ACTION_FUSION_CONVERT_MESH: return "Convert Mesh";
+        case MACRO_ACTION_FUSION_REDUCE: return "Reduce";
+        case MACRO_ACTION_FUSION_REMESH: return "Remesh";
+        case MACRO_ACTION_FUSION_FLANGE: return "Flange";
+        case MACRO_ACTION_FUSION_UNFOLD: return "Unfold";
+        case MACRO_ACTION_FUSION_REFOLD: return "Refold Faces";
+        case MACRO_ACTION_FUSION_FLAT_PATTERN: return "Create Flat Pattern";
+        case MACRO_ACTION_FUSION_SHEET_RULES: return "Sheet Metal Rules";
+        case MACRO_ACTION_FUSION_SECTION: return "Section Analysis";
+        case MACRO_ACTION_FUSION_INTERFERENCE: return "Interference";
+        default: return nullptr;
+    }
+}
+
+static void fusion_search(const char *term)
+{
+    hid_tap('s');
+    delay(400);   // let the search box open before typing
+    Keyboard.print(term);
+    delay(300);   // let the results list settle
+    hid_tap(KEY_RETURN);
+}
+
+static void send_fusion_shortcut(macro_action_t action)
+{
+    const char *term = fusion_search_term(action);
+    if (term != nullptr) {
+        fusion_search(term);
+        return;
+    }
+
+    switch (action) {
+        case MACRO_ACTION_NEW_DESIGN: hid_combo(KEY_LEFT_CTRL, 'n'); break;
+        case MACRO_ACTION_OPEN: hid_combo(KEY_LEFT_CTRL, 'o'); break;
+        case MACRO_ACTION_SAVE: hid_combo(KEY_LEFT_CTRL, 's'); break;
+        case MACRO_ACTION_UNDO: hid_combo(KEY_LEFT_CTRL, 'z'); break;
+        case MACRO_ACTION_REDO: hid_combo(KEY_LEFT_CTRL, 'y'); break;
+        case MACRO_ACTION_LINE: hid_tap('l'); break;
+        case MACRO_ACTION_RECTANGLE: hid_tap('r'); break;
+        case MACRO_ACTION_CIRCLE: hid_tap('c'); break;
+        case MACRO_ACTION_DIMENSION: hid_tap('d'); break;
+        case MACRO_ACTION_EXTRUDE: hid_tap('e'); break;
+        case MACRO_ACTION_FILLET: hid_tap('f'); break;
+        case MACRO_ACTION_MOVE: hid_tap('m'); break;
+        case MACRO_ACTION_HOLE: hid_tap('h'); break;
+        case MACRO_ACTION_FUSION_TRIM: hid_tap('t'); break;
+        case MACRO_ACTION_FUSION_OFFSET: hid_tap('o'); break;
+        case MACRO_ACTION_FUSION_PROJECT: hid_tap('p'); break;
+        case MACRO_ACTION_FUSION_CONSTRUCTION: hid_tap('x'); break;
+        case MACRO_ACTION_FUSION_PRESS_PULL: hid_tap('q'); break;
+        case MACRO_ACTION_FUSION_JOINT: hid_tap('j'); break;
+        case MACRO_ACTION_FUSION_MEASURE: hid_tap('i'); break;
+        case MACRO_ACTION_FUSION_APPEARANCE: hid_tap('a'); break;
+        case MACRO_ACTION_FUSION_VISIBILITY: hid_tap('v'); break;
+        case MACRO_ACTION_FUSION_REPEAT: hid_tap(' '); break;
+
+        /* Visual styles: Ctrl+4 shaded, Ctrl+5 shaded with hidden edges, Ctrl+7 wireframe. */
+        case MACRO_ACTION_DISPLAY_SHADED: hid_combo(KEY_LEFT_CTRL, '4'); break;
+        case MACRO_ACTION_DISPLAY_HIDDEN: hid_combo(KEY_LEFT_CTRL, '5'); break;
+        case MACRO_ACTION_DISPLAY_WIREFRAME: hid_combo(KEY_LEFT_CTRL, '7'); break;
+
+        case MACRO_ACTION_FUSION_VIEWPORTS: hid_combo(KEY_LEFT_SHIFT, '1'); break;
+        case MACRO_ACTION_FUSION_FULLSCREEN: hid_combo3(KEY_LEFT_CTRL, KEY_LEFT_SHIFT, 'f'); break;
+        case MACRO_ACTION_FUSION_NEXT_WORKSPACE: hid_combo(KEY_LEFT_CTRL, ']'); break;
+        case MACRO_ACTION_FUSION_BROWSER: hid_combo3(KEY_LEFT_CTRL, KEY_LEFT_ALT, 'b'); break;
+        case MACRO_ACTION_FUSION_DATA_PANEL: hid_combo3(KEY_LEFT_CTRL, KEY_LEFT_ALT, 'p'); break;
+        case MACRO_ACTION_FUSION_VIEWCUBE: hid_combo3(KEY_LEFT_CTRL, KEY_LEFT_ALT, 'v'); break;
+        case MACRO_ACTION_FUSION_RESET_LAYOUT: hid_combo3(KEY_LEFT_CTRL, KEY_LEFT_ALT, 'r'); break;
+
+        /* Home / Fit: waiting for the keys to be confirmed on the user's Fusion. */
+        case MACRO_ACTION_VIEW_HOME:
+        case MACRO_ACTION_VIEW_FIT:
         default: break;
     }
 }
@@ -195,6 +326,60 @@ static const char *action_name(macro_action_t action)
         case MACRO_ACTION_JOG_STEP_FINE: return "Jog step 1 mm";
         case MACRO_ACTION_JOG_STEP_COARSE: return "Jog step 10 mm";
         case MACRO_ACTION_JOG_CLOSE: return "Jog close";
+        case MACRO_ACTION_ORCA_MESH_BOOLEAN: return "Orca Mesh Boolean";
+        case MACRO_ACTION_ORCA_ASSEMBLY: return "Orca Assembly";
+        case MACRO_ACTION_ORCA_TOGGLE_PRINTABLE: return "Orca Toggle Printable";
+        case MACRO_ACTION_ORCA_SELECT_ALL: return "Orca Select All";
+        case MACRO_ACTION_ORCA_DESELECT: return "Orca Deselect";
+        case MACRO_ACTION_ORCA_COPY: return "Orca Copy";
+        case MACRO_ACTION_ORCA_PASTE: return "Orca Paste";
+        case MACRO_ACTION_ORCA_CUT_CLIPBOARD: return "Orca Cut (clipboard)";
+        case MACRO_ACTION_ORCA_DELETE_ALL: return "Orca Delete All";
+        case MACRO_ACTION_ORCA_BRIM_EARS: return "Orca Brim Ears";
+        case MACRO_ACTION_ORCA_ZOOM_IN: return "Orca Zoom In";
+        case MACRO_ACTION_ORCA_ZOOM_OUT: return "Orca Zoom Out";
+        case MACRO_ACTION_ORCA_TOGGLE_SIDEBAR: return "Orca Toggle Sidebar";
+        case MACRO_ACTION_ORCA_ONE_LAYER: return "Orca One Layer";
+        case MACRO_ACTION_ORCA_GCODE_WINDOW: return "Orca G-code Window";
+        case MACRO_ACTION_ORCA_SLIDER_UP: return "Orca Slider Up";
+        case MACRO_ACTION_ORCA_SLIDER_DOWN: return "Orca Slider Down";
+        case MACRO_ACTION_ORCA_SLIDER_LEFT: return "Orca Slider Left";
+        case MACRO_ACTION_ORCA_SLIDER_RIGHT: return "Orca Slider Right";
+        case MACRO_ACTION_ORCA_SLIDER_HOME: return "Orca Slider Home";
+        case MACRO_ACTION_ORCA_SLIDER_END: return "Orca Slider End";
+        case MACRO_ACTION_ORCA_FILAMENT_1: return "Orca Filament 1";
+        case MACRO_ACTION_ORCA_FILAMENT_2: return "Orca Filament 2";
+        case MACRO_ACTION_ORCA_FILAMENT_3: return "Orca Filament 3";
+        case MACRO_ACTION_ORCA_FILAMENT_4: return "Orca Filament 4";
+        case MACRO_ACTION_ORCA_FILAMENT_5: return "Orca Filament 5";
+        case MACRO_ACTION_ORCA_FILAMENT_6: return "Orca Filament 6";
+        case MACRO_ACTION_ORCA_FILAMENT_7: return "Orca Filament 7";
+        case MACRO_ACTION_ORCA_FILAMENT_8: return "Orca Filament 8";
+        case MACRO_ACTION_ORCA_FILAMENT_9: return "Orca Filament 9";
+        case MACRO_ACTION_ORCA_PRINT_PLATE: return "Orca Print Plate";
+        case MACRO_ACTION_ORCA_EXPORT_GCODE: return "Orca Export G-code";
+        case MACRO_ACTION_ORCA_SAVE_AS: return "Orca Save As";
+        case MACRO_ACTION_ORCA_SHORTCUT_LIST: return "Orca Shortcut List";
+        case MACRO_ACTION_ORCA_3DCONNEXION: return "Orca 3Dconnexion";
+        case MACRO_ACTION_ORCA_PREFERENCES: return "Orca Preferences";
+        case MACRO_ACTION_ORCA_SWITCH_TAB: return "Orca Switch Tab";
+        case MACRO_ACTION_FUSION_VISIBILITY: return "Fusion Visibility";
+        case MACRO_ACTION_FUSION_FULLSCREEN: return "Fusion Full Screen";
+        case MACRO_ACTION_FUSION_VIEWPORTS: return "Fusion 4 Views";
+        case MACRO_ACTION_FUSION_NEXT_WORKSPACE: return "Fusion Next Workspace";
+        case MACRO_ACTION_FUSION_TRIM: return "Fusion Trim";
+        case MACRO_ACTION_FUSION_OFFSET: return "Fusion Offset";
+        case MACRO_ACTION_FUSION_PROJECT: return "Fusion Project";
+        case MACRO_ACTION_FUSION_CONSTRUCTION: return "Fusion Construction";
+        case MACRO_ACTION_FUSION_PRESS_PULL: return "Fusion Press Pull";
+        case MACRO_ACTION_FUSION_JOINT: return "Fusion Joint";
+        case MACRO_ACTION_FUSION_MEASURE: return "Fusion Measure";
+        case MACRO_ACTION_FUSION_APPEARANCE: return "Fusion Appearance";
+        case MACRO_ACTION_FUSION_REPEAT: return "Fusion Repeat Last";
+        case MACRO_ACTION_FUSION_BROWSER: return "Fusion Browser";
+        case MACRO_ACTION_FUSION_DATA_PANEL: return "Fusion Data Panel";
+        case MACRO_ACTION_FUSION_VIEWCUBE: return "Fusion ViewCube";
+        case MACRO_ACTION_FUSION_RESET_LAYOUT: return "Fusion Reset Layout";
         default: return "Unknown";
     }
 }
@@ -202,7 +387,18 @@ static const char *action_name(macro_action_t action)
 static void on_macro_action(macro_action_t action, void *user_data)
 {
     (void)user_data;
-    Serial.printf("Touch action: %s (%d)\n", action_name(action), static_cast<int>(action));
+    const char *search = fusion_search_term(action);
+    Serial.printf("Touch action: %s (%d)%s%s\n", action_name(action), static_cast<int>(action),
+                  search != nullptr ? " search: " : "", search != nullptr ? search : "");
+
+    if ((action >= MACRO_ACTION_ORCA_PREPARE && action <= MACRO_ACTION_ORCA_SETTINGS) ||
+        (action >= MACRO_ACTION_NAV_HOME && action <= MACRO_ACTION_NAV_SETTINGS)) {
+        lv_mem_monitor_t mon;
+        lv_mem_monitor(&mon);
+        Serial.printf("LVGL heap: %u%% used, %u bytes free, %u%% fragmented\n",
+                      mon.used_pct, static_cast<unsigned>(mon.free_size), mon.frag_pct);
+        return;
+    }
 
     if (action == MACRO_ACTION_PROFILE_FUSION || action == MACRO_ACTION_PROFILE_ORCA) {
         s_active_profile = action;
@@ -210,6 +406,8 @@ static void on_macro_action(macro_action_t action, void *user_data)
     }
     if (s_active_profile == MACRO_ACTION_PROFILE_ORCA) {
         send_orca_shortcut(action);
+    } else if (s_active_profile == MACRO_ACTION_PROFILE_FUSION) {
+        send_fusion_shortcut(action);
     }
 }
 
@@ -285,7 +483,6 @@ void setup()
     ESP_ERROR_CHECK(esp_lv_adapter_start());
     ESP_ERROR_CHECK(esp_lv_adapter_lock(-1));
     macro_deck_ui_create(on_macro_action, nullptr);
-    macro_deck_ui_set_clock("2026-09-17", "10:24");
     esp_lv_adapter_unlock();
 
     Serial.println("Macro Deck UI ready");
