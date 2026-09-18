@@ -17,6 +17,7 @@ using namespace esp_panel::board;
 
 static USBHIDKeyboard Keyboard;
 static macro_action_t s_active_profile = MACRO_ACTION_PROFILE_FUSION;
+static bool s_jog_fine = false;
 
 static void hid_tap(uint8_t key)
 {
@@ -42,6 +43,15 @@ static void hid_combo3(uint8_t modifier1, uint8_t modifier2, uint8_t key)
     Keyboard.releaseAll();
 }
 
+static void hid_jog(uint8_t arrow)
+{
+    if (s_jog_fine) {
+        hid_combo(KEY_LEFT_SHIFT, arrow);
+    } else {
+        hid_tap(arrow);
+    }
+}
+
 static void send_orca_shortcut(macro_action_t action)
 {
     switch (action) {
@@ -49,7 +59,6 @@ static void send_orca_shortcut(macro_action_t action)
         case MACRO_ACTION_ORCA_OPEN_PROJECT: hid_combo(KEY_LEFT_CTRL, 'o'); break;
         case MACRO_ACTION_ORCA_SAVE_PROJECT: hid_combo(KEY_LEFT_CTRL, 's'); break;
         case MACRO_ACTION_ORCA_IMPORT_MODEL: hid_combo(KEY_LEFT_CTRL, 'i'); break;
-        case MACRO_ACTION_ORCA_PREFERENCES: hid_combo(KEY_LEFT_CTRL, 'p'); break;
         case MACRO_ACTION_ORCA_ARRANGE: hid_tap('a'); break;
         case MACRO_ACTION_ORCA_AUTO_ORIENT: hid_tap('q'); break;
         case MACRO_ACTION_ORCA_LAY_FLAT: hid_tap('f'); break;
@@ -57,16 +66,19 @@ static void send_orca_shortcut(macro_action_t action)
         case MACRO_ACTION_ORCA_ROTATE: hid_tap('r'); break;
         case MACRO_ACTION_ORCA_SCALE: hid_tap('s'); break;
         case MACRO_ACTION_ORCA_CUT: hid_tap('c'); break;
-        case MACRO_ACTION_ORCA_MESH_BOOLEAN: hid_tap('b'); break;
         case MACRO_ACTION_ORCA_ADD_TEXT: hid_tap('t'); break;
         case MACRO_ACTION_ORCA_SEAM_PAINTING: hid_tap('p'); break;
         case MACRO_ACTION_UNDO: hid_combo(KEY_LEFT_CTRL, 'z'); break;
         case MACRO_ACTION_REDO: hid_combo(KEY_LEFT_CTRL, 'y'); break;
         case MACRO_ACTION_ORCA_DELETE: hid_tap(KEY_DELETE); break;
         case MACRO_ACTION_ORCA_SLICE: hid_combo(KEY_LEFT_CTRL, 'r'); break;
-        case MACRO_ACTION_ORCA_PRINT_PLATE:
-            hid_combo3(KEY_LEFT_CTRL, KEY_LEFT_SHIFT, 'g');
-            break;
+        case MACRO_ACTION_ORCA_CLONE: hid_combo(KEY_LEFT_CTRL, 'k'); break;
+        case MACRO_ACTION_ORCA_INSTANCE_ADD: hid_tap('+'); break;
+        case MACRO_ACTION_ORCA_INSTANCE_REMOVE: hid_tap('-'); break;
+        case MACRO_ACTION_ORCA_SUPPORT_PAINTING: hid_tap('l'); break;
+        case MACRO_ACTION_ORCA_FUZZY_SKIN: hid_tap('h'); break;
+        case MACRO_ACTION_ORCA_COLOR_PAINTING: hid_tap('n'); break;
+        case MACRO_ACTION_ORCA_MEASURE: hid_tap('u'); break;
 
         case MACRO_ACTION_ORCA_VIEW_DEFAULT: hid_combo(KEY_LEFT_CTRL, '0'); break;
         case MACRO_ACTION_ORCA_VIEW_TOP: hid_combo(KEY_LEFT_CTRL, '1'); break;
@@ -76,6 +88,15 @@ static void send_orca_shortcut(macro_action_t action)
         case MACRO_ACTION_ORCA_VIEW_LEFT: hid_combo(KEY_LEFT_CTRL, '5'); break;
         case MACRO_ACTION_ORCA_VIEW_RIGHT: hid_combo(KEY_LEFT_CTRL, '6'); break;
         case MACRO_ACTION_ORCA_VIEW_PREVIEW: hid_tap(KEY_TAB); break;
+
+        /* Orca moves the current selection 10 mm per arrow, 1 mm while Shift is held. */
+        case MACRO_ACTION_JOG_Y_PLUS: hid_jog(KEY_UP_ARROW); break;
+        case MACRO_ACTION_JOG_Y_MINUS: hid_jog(KEY_DOWN_ARROW); break;
+        case MACRO_ACTION_JOG_X_PLUS: hid_jog(KEY_RIGHT_ARROW); break;
+        case MACRO_ACTION_JOG_X_MINUS: hid_jog(KEY_LEFT_ARROW); break;
+        case MACRO_ACTION_JOG_STEP_FINE: s_jog_fine = true; break;
+        case MACRO_ACTION_JOG_STEP_COARSE: s_jog_fine = false; break;
+        case MACRO_ACTION_JOG_CLOSE: break;
         default: break;
     }
 }
@@ -113,7 +134,6 @@ static const char *action_name(macro_action_t action)
         case MACRO_ACTION_DISPLAY_HIDDEN: return "Display Hidden";
         case MACRO_ACTION_PROFILE_FUSION: return "Profile Fusion 360";
         case MACRO_ACTION_PROFILE_ORCA: return "Profile Orca Slicer";
-        case MACRO_ACTION_PROFILE_BAMBU: return "Profile Bambu Studio";
         case MACRO_ACTION_PROFILE_SYSTEM: return "Profile System";
         case MACRO_ACTION_NAV_HOME: return "Nav Home";
         case MACRO_ACTION_NAV_SKETCH: return "Nav Sketch";
@@ -146,6 +166,7 @@ static const char *action_name(macro_action_t action)
         case MACRO_ACTION_ORCA_SEAM_PAINTING: return "Orca Seam Painting";
         case MACRO_ACTION_ORCA_DELETE: return "Orca Delete";
         case MACRO_ACTION_ORCA_SLICE: return "Orca Slice";
+        case MACRO_ACTION_ORCA_CLONE: return "Orca Clone Selected";
         case MACRO_ACTION_ORCA_SEND_TO_PRINTER: return "Orca Send to Printer";
         case MACRO_ACTION_ORCA_DISPLAY_PREPARE: return "Orca Display Prepare";
         case MACRO_ACTION_ORCA_DISPLAY_PREVIEW: return "Orca Display Preview";
@@ -153,10 +174,12 @@ static const char *action_name(macro_action_t action)
         case MACRO_ACTION_ORCA_NEW_PROJECT: return "Orca New Project";
         case MACRO_ACTION_ORCA_OPEN_PROJECT: return "Orca Open Project";
         case MACRO_ACTION_ORCA_SAVE_PROJECT: return "Orca Save Project";
-        case MACRO_ACTION_ORCA_PREFERENCES: return "Orca Preferences";
         case MACRO_ACTION_ORCA_CUT: return "Orca Cut";
-        case MACRO_ACTION_ORCA_MESH_BOOLEAN: return "Orca Mesh Boolean";
-        case MACRO_ACTION_ORCA_PRINT_PLATE: return "Orca Print Plate";
+        case MACRO_ACTION_ORCA_INSTANCE_ADD: return "Orca Add Instance";
+        case MACRO_ACTION_ORCA_INSTANCE_REMOVE: return "Orca Remove Instance";
+        case MACRO_ACTION_ORCA_FUZZY_SKIN: return "Orca Fuzzy Skin";
+        case MACRO_ACTION_ORCA_COLOR_PAINTING: return "Orca Color Painting";
+        case MACRO_ACTION_ORCA_MEASURE: return "Orca Measure";
         case MACRO_ACTION_ORCA_VIEW_DEFAULT: return "Orca View Default";
         case MACRO_ACTION_ORCA_VIEW_TOP: return "Orca View Top";
         case MACRO_ACTION_ORCA_VIEW_BOTTOM: return "Orca View Bottom";
@@ -165,6 +188,13 @@ static const char *action_name(macro_action_t action)
         case MACRO_ACTION_ORCA_VIEW_LEFT: return "Orca View Left";
         case MACRO_ACTION_ORCA_VIEW_RIGHT: return "Orca View Right";
         case MACRO_ACTION_ORCA_VIEW_PREVIEW: return "Orca View Preview";
+        case MACRO_ACTION_JOG_Y_PLUS: return "Jog Y+";
+        case MACRO_ACTION_JOG_Y_MINUS: return "Jog Y-";
+        case MACRO_ACTION_JOG_X_PLUS: return "Jog X+";
+        case MACRO_ACTION_JOG_X_MINUS: return "Jog X-";
+        case MACRO_ACTION_JOG_STEP_FINE: return "Jog step 1 mm";
+        case MACRO_ACTION_JOG_STEP_COARSE: return "Jog step 10 mm";
+        case MACRO_ACTION_JOG_CLOSE: return "Jog close";
         default: return "Unknown";
     }
 }

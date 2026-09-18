@@ -2,6 +2,7 @@
 
 #include <stdbool.h>
 #include <stddef.h>
+#include <string.h>
 #include <esp_heap_caps.h>
 
 #if LVGL_VERSION_MAJOR != 8
@@ -10,8 +11,11 @@
 
 #define C_HEX(hex) lv_color_hex(hex)
 
-extern const uint8_t ui_reference_rgb888[];
-extern const uint8_t ui_orca_rgb888[];
+extern const uint16_t ui_reference_rgb565[];
+extern const uint16_t ui_orca_rgb565[];
+
+/* Images are stored as RGB565 so they can be copied straight into the canvas. */
+_Static_assert(sizeof(lv_color_t) == 2, "macro_deck_ui expects LV_COLOR_DEPTH 16");
 
 typedef struct {
     const char *icon;
@@ -40,6 +44,10 @@ static lv_color_t *s_reference_pixels;
 static lv_obj_t *s_reference_canvas;
 static lv_obj_t *s_fusion_hotspots;
 static lv_obj_t *s_orca_hotspots;
+static lv_obj_t *s_jog_pad;
+static lv_obj_t *s_jog_step_label;
+static bool s_jog_fine;
+static macro_action_t s_profile = MACRO_ACTION_PROFILE_FUSION;
 
 static lv_style_t s_style_screen;
 static lv_style_t s_style_panel;
@@ -50,8 +58,9 @@ static lv_style_t s_style_text;
 static lv_style_t s_style_muted;
 static bool s_styles_ready;
 
-static void load_reference_image(const uint8_t *source_pixels);
+static void load_reference_image(const uint16_t *source_pixels);
 static void set_active_profile(macro_action_t profile);
+static void build_jog_pad(lv_obj_t *parent);
 
 static const action_spec_t s_main_actions[] = {
     {LV_SYMBOL_FILE, "New Design", "Ctrl + N", MACRO_ACTION_NEW_DESIGN, 0xB8D8FF},
@@ -146,7 +155,8 @@ static lv_obj_t *make_label(lv_obj_t *parent, const char *text, const lv_font_t 
 
 static void action_event_cb(lv_event_t *event)
 {
-    if (lv_event_get_code(event) != LV_EVENT_CLICKED) return;
+    const lv_event_code_t code = lv_event_get_code(event);
+    if (code != LV_EVENT_CLICKED && code != LV_EVENT_LONG_PRESSED_REPEAT) return;
     const action_spec_t *spec = (const action_spec_t *)lv_event_get_user_data(event);
     if (spec == NULL) return;
 
@@ -155,8 +165,26 @@ static void action_event_cb(lv_event_t *event)
         set_active_profile(spec->action);
     }
 
+    /* The Move button doubles as the jog pad opener while Orca is active. */
+    if (spec->action == MACRO_ACTION_MOVE && s_profile == MACRO_ACTION_PROFILE_ORCA &&
+        s_jog_pad != NULL) {
+        lv_obj_clear_flag(s_jog_pad, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_move_foreground(s_jog_pad);
+    } else if (spec->action == MACRO_ACTION_JOG_CLOSE && s_jog_pad != NULL) {
+        lv_obj_add_flag(s_jog_pad, LV_OBJ_FLAG_HIDDEN);
+    }
+
+    macro_action_t action = spec->action;
+    if (action == MACRO_ACTION_JOG_STEP_FINE || action == MACRO_ACTION_JOG_STEP_COARSE) {
+        s_jog_fine = !s_jog_fine;
+        action = s_jog_fine ? MACRO_ACTION_JOG_STEP_FINE : MACRO_ACTION_JOG_STEP_COARSE;
+        if (s_jog_step_label != NULL) {
+            lv_label_set_text(s_jog_step_label, s_jog_fine ? "1 mm" : "10 mm");
+        }
+    }
+
     if (s_action_cb != NULL) {
-        s_action_cb(spec->action, s_action_user_data);
+        s_action_cb(action, s_action_user_data);
     }
 }
 
@@ -193,7 +221,6 @@ static void build_reference_ui(lv_obj_t *parent)
     static const action_spec_t profile_actions[] = {
         {"F", "Fusion 360", "", MACRO_ACTION_PROFILE_FUSION, COLOR_ORANGE},
         {"O", "Orca Slicer", "", MACRO_ACTION_PROFILE_ORCA, 0x24D4C1},
-        {"B", "Bambu Studio", "", MACRO_ACTION_PROFILE_BAMBU, 0x45C866},
         {LV_SYMBOL_SETTINGS, "System", "", MACRO_ACTION_PROFILE_SYSTEM, 0xBED4F7},
     };
 
@@ -210,7 +237,7 @@ static void build_reference_ui(lv_obj_t *parent)
     lv_canvas_set_buffer(s_reference_canvas, s_reference_pixels, 800, 480, LV_IMG_CF_TRUE_COLOR);
     lv_obj_set_pos(s_reference_canvas, 0, 0);
     lv_obj_clear_flag(s_reference_canvas, LV_OBJ_FLAG_CLICKABLE);
-    load_reference_image(ui_reference_rgb888);
+    load_reference_image(ui_reference_rgb565);
 
     s_fusion_hotspots = lv_obj_create(parent);
     lv_obj_remove_style_all(s_fusion_hotspots);
@@ -239,8 +266,7 @@ static void build_reference_ui(lv_obj_t *parent)
 
     make_hotspot(s_fusion_hotspots, &profile_actions[0], 78, 432, 128, 40);
     make_hotspot(s_fusion_hotspots, &profile_actions[1], 208, 432, 128, 40);
-    make_hotspot(s_fusion_hotspots, &profile_actions[2], 337, 432, 142, 40);
-    make_hotspot(s_fusion_hotspots, &profile_actions[3], 480, 432, 122, 40);
+    make_hotspot(s_fusion_hotspots, &profile_actions[2], 337, 432, 118, 40);
 
     static const action_spec_t orca_nav_actions[] = {
         {"P", "Prepare", "", MACRO_ACTION_ORCA_PREPARE, 0x24D4C1},
@@ -252,32 +278,35 @@ static void build_reference_ui(lv_obj_t *parent)
         {"T", "Tools", "", MACRO_ACTION_ORCA_TOOLS, 0xB7C9E8},
         {LV_SYMBOL_SETTINGS, "Settings", "", MACRO_ACTION_ORCA_SETTINGS, 0xB7C9E8},
     };
+    /* Reading order of the 6 x 4 grid drawn in ui_orca_rgb565. */
     static const action_spec_t orca_actions[] = {
-        {LV_SYMBOL_FILE, "New Project", "Ctrl + N", MACRO_ACTION_ORCA_NEW_PROJECT, 0x55BFFF},
-        {LV_SYMBOL_DIRECTORY, "Open Project", "Ctrl + O", MACRO_ACTION_ORCA_OPEN_PROJECT, 0x55BFFF},
-        {LV_SYMBOL_SAVE, "Save Project", "Ctrl + S", MACRO_ACTION_ORCA_SAVE_PROJECT, 0x55BFFF},
-        {LV_SYMBOL_DIRECTORY, "Import Model", "Ctrl + I", MACRO_ACTION_ORCA_IMPORT_MODEL, 0x55BFFF},
-        {LV_SYMBOL_SETTINGS, "Preferences", "Ctrl + P", MACRO_ACTION_ORCA_PREFERENCES, 0x55BFFF},
+        {LV_SYMBOL_FILE, "New", "Ctrl + N", MACRO_ACTION_ORCA_NEW_PROJECT, 0x55BFFF},
+        {LV_SYMBOL_DIRECTORY, "Open", "Ctrl + O", MACRO_ACTION_ORCA_OPEN_PROJECT, 0x55BFFF},
+        {LV_SYMBOL_SAVE, "Save", "Ctrl + S", MACRO_ACTION_ORCA_SAVE_PROJECT, 0x55BFFF},
+        {LV_SYMBOL_DIRECTORY, "Import", "Ctrl + I", MACRO_ACTION_ORCA_IMPORT_MODEL, 0x55BFFF},
         {"A", "Arrange", "A", MACRO_ACTION_ORCA_ARRANGE, 0x55BFFF},
-        {"Q", "Auto Orient", "Q", MACRO_ACTION_ORCA_AUTO_ORIENT, 0x55BFFF},
+        {"Q", "Orient", "Q", MACRO_ACTION_ORCA_AUTO_ORIENT, 0x55BFFF},
+        {"+", "Instance +", "+", MACRO_ACTION_ORCA_INSTANCE_ADD, 0x30E57B},
+        {"-", "Instance -", "-", MACRO_ACTION_ORCA_INSTANCE_REMOVE, 0xFF5964},
         {"M", "Move", "M", MACRO_ACTION_MOVE, 0x3A9BFF},
         {"R", "Rotate", "R", MACRO_ACTION_ORCA_ROTATE, 0x3A9BFF},
         {"S", "Scale", "S", MACRO_ACTION_ORCA_SCALE, 0x3A9BFF},
         {"F", "Lay Flat", "F", MACRO_ACTION_ORCA_LAY_FLAT, 0x55BFFF},
         {"C", "Cut", "C", MACRO_ACTION_ORCA_CUT, 0x55BFFF},
-        {"B", "Mesh Boolean", "B", MACRO_ACTION_ORCA_MESH_BOOLEAN, 0x55BFFF},
-        {"P", "Seam Painting", "P", MACRO_ACTION_ORCA_SEAM_PAINTING, 0xA14CFF},
+        {"L", "Support", "L", MACRO_ACTION_ORCA_SUPPORT_PAINTING, 0x8BE0FF},
+        {"P", "Seam", "P", MACRO_ACTION_ORCA_SEAM_PAINTING, 0xA14CFF},
+        {"H", "Fuzzy Skin", "H", MACRO_ACTION_ORCA_FUZZY_SKIN, 0xA14CFF},
+        {"N", "Color", "N", MACRO_ACTION_ORCA_COLOR_PAINTING, 0x68B7FF},
         {"T", "Add Text", "T", MACRO_ACTION_ORCA_ADD_TEXT, 0x68B7FF},
+        {"U", "Measure", "U", MACRO_ACTION_ORCA_MEASURE, 0x68B7FF},
         {LV_SYMBOL_LEFT, "Undo", "Ctrl + Z", MACRO_ACTION_UNDO, 0xBED4F7},
         {LV_SYMBOL_RIGHT, "Redo", "Ctrl + Y", MACRO_ACTION_REDO, 0xBED4F7},
         {LV_SYMBOL_TRASH, "Delete", "Del", MACRO_ACTION_ORCA_DELETE, 0xFF5964},
-        {"S", "Slice", "Ctrl + R", MACRO_ACTION_ORCA_SLICE, 0x30E57B},
-        {LV_SYMBOL_UPLOAD, "Print Plate", "Ctrl + Shift + G", MACRO_ACTION_ORCA_PRINT_PLATE, 0x31C8F5},
+        {"K", "Clone", "Ctrl + K", MACRO_ACTION_ORCA_CLONE, 0x55BFFF},
     };
     static const action_spec_t orca_bottom_actions[] = {
         {"F", "Fusion 360", "", MACRO_ACTION_PROFILE_FUSION, COLOR_ORANGE},
         {"O", "Orca Slicer", "", MACRO_ACTION_PROFILE_ORCA, 0x24D4C1},
-        {"B", "Bambu Studio", "", MACRO_ACTION_PROFILE_BAMBU, 0x45C866},
         {LV_SYMBOL_SETTINGS, "System", "", MACRO_ACTION_PROFILE_SYSTEM, 0xBED4F7},
     };
     static const action_spec_t orca_view_actions[] = {
@@ -301,52 +330,125 @@ static void build_reference_ui(lv_obj_t *parent)
     for (size_t i = 0; i < 8; ++i) {
         make_hotspot(s_orca_hotspots, &orca_nav_actions[i], 4, 84 + (lv_coord_t)i * 42, 123, 41);
     }
-    for (size_t i = 0; i < 20; ++i) {
-        const lv_coord_t col = (lv_coord_t)(i % 5);
-        const lv_coord_t row = (lv_coord_t)(i / 5);
+    for (size_t i = 0; i < sizeof(orca_actions) / sizeof(orca_actions[0]); ++i) {
+        const lv_coord_t col = (lv_coord_t)(i % 6);
+        const lv_coord_t row = (lv_coord_t)(i / 6);
         make_hotspot(s_orca_hotspots, &orca_actions[i],
-                     133 + col * 97, 88 + row * 85, 93, 82);
+                     134 + col * 80, 88 + row * 85, 76, 82);
     }
-    make_hotspot(s_orca_hotspots, &orca_nav_actions[5], 626, 88, 160, 66);
-    make_hotspot(s_orca_hotspots, &orca_view_actions[0], 626, 174, 48, 58);
-    make_hotspot(s_orca_hotspots, &orca_view_actions[1], 681, 174, 48, 58);
-    make_hotspot(s_orca_hotspots, &orca_view_actions[2], 737, 174, 49, 58);
-    make_hotspot(s_orca_hotspots, &orca_view_actions[3], 638, 242, 56, 58);
-    make_hotspot(s_orca_hotspots, &orca_view_actions[4], 713, 242, 57, 58);
+    /* The ACTIVE PRINTER panel was repainted as the Slice Plate button. */
+    static const action_spec_t orca_slice = {"S", "Slice Plate", "Ctrl + R", MACRO_ACTION_ORCA_SLICE, 0x30E57B};
+    make_hotspot(s_orca_hotspots, &orca_slice, 620, 88, 168, 63);
+    /* VIEW and DISPLAY were merged into one 3 x 3 panel: 8 view buttons. */
+    for (size_t i = 0; i < 5; ++i) {
+        const lv_coord_t col = (lv_coord_t)(i % 3);
+        const lv_coord_t row = (lv_coord_t)(i / 3);
+        make_hotspot(s_orca_hotspots, &orca_view_actions[i],
+                     626 + col * 54, 186 + row * 70, 52, 64);
+    }
     for (size_t i = 0; i < 3; ++i) {
+        const lv_coord_t slot = (lv_coord_t)(i + 5);
         make_hotspot(s_orca_hotspots, &orca_display_actions[i],
-                     628 + (lv_coord_t)i * 55, 334, 50, 69);
+                     626 + (slot % 3) * 54, 186 + (slot / 3) * 70, 52, 64);
     }
     make_hotspot(s_orca_hotspots, &orca_bottom_actions[0], 78, 432, 128, 40);
     make_hotspot(s_orca_hotspots, &orca_bottom_actions[1], 208, 432, 128, 40);
-    make_hotspot(s_orca_hotspots, &orca_bottom_actions[2], 337, 432, 142, 40);
-    make_hotspot(s_orca_hotspots, &orca_bottom_actions[3], 480, 432, 122, 40);
+    make_hotspot(s_orca_hotspots, &orca_bottom_actions[2], 337, 432, 118, 40);
     make_hotspot(s_orca_hotspots, &orca_nav_actions[7], 744, 12, 44, 44);
     lv_obj_add_flag(s_orca_hotspots, LV_OBJ_FLAG_HIDDEN);
+
+    build_jog_pad(parent);
 }
 
-static void load_reference_image(const uint8_t *source_pixels)
+static lv_obj_t *make_jog_button(lv_obj_t *parent, const action_spec_t *spec,
+                                 lv_coord_t x, lv_coord_t y, lv_coord_t w, lv_coord_t h,
+                                 bool repeat)
+{
+    lv_obj_t *button = lv_btn_create(parent);
+    lv_obj_remove_style_all(button);
+    lv_obj_set_pos(button, x, y);
+    lv_obj_set_size(button, w, h);
+    lv_obj_set_style_radius(button, 10, 0);
+    lv_obj_set_style_bg_color(button, C_HEX(COLOR_CARD), 0);
+    lv_obj_set_style_bg_opa(button, LV_OPA_COVER, 0);
+    lv_obj_set_style_border_color(button, C_HEX(0x24333D), 0);
+    lv_obj_set_style_border_width(button, 1, 0);
+    lv_obj_set_style_bg_color(button, C_HEX(COLOR_BLUE), LV_STATE_PRESSED);
+    lv_obj_set_style_bg_opa(button, LV_OPA_40, LV_STATE_PRESSED);
+    lv_obj_add_event_cb(button, action_event_cb, LV_EVENT_CLICKED, (void *)spec);
+    if (repeat) {
+        lv_obj_add_event_cb(button, action_event_cb, LV_EVENT_LONG_PRESSED_REPEAT, (void *)spec);
+    }
+
+    lv_obj_t *icon = make_label(button, spec->icon, &lv_font_montserrat_26, spec->accent);
+    lv_obj_align(icon, LV_ALIGN_CENTER, 0, spec->label[0] == '\0' ? 0 : -9);
+    if (spec->label[0] != '\0') {
+        lv_obj_t *label = make_label(button, spec->label, &lv_font_montserrat_12, COLOR_MUTED);
+        lv_obj_align(label, LV_ALIGN_CENTER, 0, 17);
+    }
+    return button;
+}
+
+static void build_jog_pad(lv_obj_t *parent)
+{
+    static const action_spec_t jog_up = {LV_SYMBOL_UP, "Y +", "", MACRO_ACTION_JOG_Y_PLUS, 0x8BE0FF};
+    static const action_spec_t jog_down = {LV_SYMBOL_DOWN, "Y -", "", MACRO_ACTION_JOG_Y_MINUS, 0x8BE0FF};
+    static const action_spec_t jog_left = {LV_SYMBOL_LEFT, "X -", "", MACRO_ACTION_JOG_X_MINUS, 0x8BE0FF};
+    static const action_spec_t jog_right = {LV_SYMBOL_RIGHT, "X +", "", MACRO_ACTION_JOG_X_PLUS, 0x8BE0FF};
+    static const action_spec_t jog_step = {"", "", "", MACRO_ACTION_JOG_STEP_COARSE, 0x30E57B};
+    static const action_spec_t jog_close = {LV_SYMBOL_CLOSE, "", "", MACRO_ACTION_JOG_CLOSE, 0xFF5964};
+
+    s_jog_pad = lv_obj_create(parent);
+    lv_obj_remove_style_all(s_jog_pad);
+    lv_obj_set_pos(s_jog_pad, 236, 96);
+    lv_obj_set_size(s_jog_pad, 328, 300);
+    lv_obj_set_style_radius(s_jog_pad, 14, 0);
+    lv_obj_set_style_bg_color(s_jog_pad, C_HEX(0x0A141A), 0);
+    lv_obj_set_style_bg_opa(s_jog_pad, LV_OPA_COVER, 0);
+    lv_obj_set_style_border_color(s_jog_pad, C_HEX(0x2B4453), 0);
+    lv_obj_set_style_border_width(s_jog_pad, 2, 0);
+    lv_obj_clear_flag(s_jog_pad, LV_OBJ_FLAG_SCROLLABLE);
+
+    lv_obj_t *title = make_label(s_jog_pad, "MOVE SELECTION", &lv_font_montserrat_14, 0xE6F2FF);
+    lv_obj_set_pos(title, 20, 16);
+    lv_obj_t *hint = make_label(s_jog_pad, "Arrow keys - select a model in Orca first",
+                                &lv_font_montserrat_12, COLOR_MUTED);
+    lv_obj_set_pos(hint, 20, 38);
+
+    make_jog_button(s_jog_pad, &jog_close, 266, 12, 46, 40, false);
+    make_jog_button(s_jog_pad, &jog_up, 116, 66, 96, 72, true);
+    make_jog_button(s_jog_pad, &jog_left, 14, 146, 96, 72, true);
+    make_jog_button(s_jog_pad, &jog_right, 218, 146, 96, 72, true);
+    make_jog_button(s_jog_pad, &jog_down, 116, 226, 96, 72, true);
+
+    lv_obj_t *step = make_jog_button(s_jog_pad, &jog_step, 116, 146, 96, 72, false);
+    s_jog_step_label = make_label(step, "10 mm", &lv_font_montserrat_16, 0x30E57B);
+    lv_obj_align(s_jog_step_label, LV_ALIGN_CENTER, 0, -9);
+    lv_obj_t *step_hint = make_label(step, "step", &lv_font_montserrat_12, COLOR_MUTED);
+    lv_obj_align(step_hint, LV_ALIGN_CENTER, 0, 15);
+
+    lv_obj_add_flag(s_jog_pad, LV_OBJ_FLAG_HIDDEN);
+}
+
+static void load_reference_image(const uint16_t *source_pixels)
 {
     if (s_reference_pixels == NULL || source_pixels == NULL) return;
-    for (uint32_t i = 0; i < 800U * 480U; ++i) {
-        const uint32_t source = i * 3U;
-        s_reference_pixels[i] = lv_color_make(
-            source_pixels[source], source_pixels[source + 1U], source_pixels[source + 2U]
-        );
-    }
+    memcpy(s_reference_pixels, source_pixels, 800U * 480U * sizeof(lv_color_t));
     if (s_reference_canvas != NULL) lv_obj_invalidate(s_reference_canvas);
 }
 
 static void set_active_profile(macro_action_t profile)
 {
     if (s_fusion_hotspots == NULL || s_orca_hotspots == NULL) return;
+    s_profile = profile;
+    if (s_jog_pad != NULL) lv_obj_add_flag(s_jog_pad, LV_OBJ_FLAG_HIDDEN);
     if (profile == MACRO_ACTION_PROFILE_ORCA) {
-        load_reference_image(ui_orca_rgb888);
+        load_reference_image(ui_orca_rgb565);
         lv_obj_add_flag(s_fusion_hotspots, LV_OBJ_FLAG_HIDDEN);
         lv_obj_clear_flag(s_orca_hotspots, LV_OBJ_FLAG_HIDDEN);
         lv_obj_move_foreground(s_orca_hotspots);
     } else {
-        load_reference_image(ui_reference_rgb888);
+        load_reference_image(ui_reference_rgb565);
         lv_obj_add_flag(s_orca_hotspots, LV_OBJ_FLAG_HIDDEN);
         lv_obj_clear_flag(s_fusion_hotspots, LV_OBJ_FLAG_HIDDEN);
         lv_obj_move_foreground(s_fusion_hotspots);
@@ -557,7 +659,6 @@ static void build_bottom_bar(lv_obj_t *parent)
     static const action_spec_t profile_actions[] = {
         {"F", "Fusion 360", "", MACRO_ACTION_PROFILE_FUSION, COLOR_ORANGE},
         {"O", "Orca Slicer", "", MACRO_ACTION_PROFILE_ORCA, 0x24D4C1},
-        {"B", "Bambu Studio", "", MACRO_ACTION_PROFILE_BAMBU, 0x45C866},
         {LV_SYMBOL_SETTINGS, "System", "", MACRO_ACTION_PROFILE_SYSTEM, 0xBED4F7},
     };
 
@@ -573,7 +674,7 @@ static void build_bottom_bar(lv_obj_t *parent)
 
     lv_obj_t *apps = make_label(bar, "Apps", &lv_font_montserrat_14, 0xB7C9E8);
     lv_obj_set_pos(apps, 22, 14);
-    for (size_t i = 0; i < 4; ++i) {
+    for (size_t i = 0; i < sizeof(profile_actions) / sizeof(profile_actions[0]); ++i) {
         const action_spec_t *spec = &profile_actions[i];
         lv_obj_t *button = lv_btn_create(bar);
         lv_obj_remove_style_all(button);
