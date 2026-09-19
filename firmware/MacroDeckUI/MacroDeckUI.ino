@@ -225,9 +225,10 @@ static void send_fusion_shortcut(macro_action_t action)
         case MACRO_ACTION_FUSION_VIEWCUBE: hid_combo3(KEY_LEFT_CTRL, KEY_LEFT_ALT, 'v'); break;
         case MACRO_ACTION_FUSION_RESET_LAYOUT: hid_combo3(KEY_LEFT_CTRL, KEY_LEFT_ALT, 'r'); break;
 
-        /* Home / Fit: waiting for the keys to be confirmed on the user's Fusion. */
+        case MACRO_ACTION_VIEW_FIT: hid_tap(KEY_F6); break;   // confirmed on the user's Fusion
+
+        /* Home: no default key found yet. */
         case MACRO_ACTION_VIEW_HOME:
-        case MACRO_ACTION_VIEW_FIT:
         default: break;
     }
 }

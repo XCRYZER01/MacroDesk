@@ -121,7 +121,8 @@ S search = กด `S` เปิดช่องค้นหาคำสั่ง 
 | ปุ่ม | HID ที่ส่ง |
 |---|---|
 | ACTIVE WORKSPACE (กล่องทั้งกล่อง) | Ctrl+] สลับ workspace ถัดไป |
-| Home / Fit | ยังไม่ส่ง รอผู้ใช้ยืนยันปุ่ม (ป้าย Fit ในภาพเขียน `F` ซึ่งผิด เพราะ F คือ Fillet ต้องแก้ตอนยืนยันแล้ว) |
+| Fit | F6 (ผู้ใช้ยืนยันบน Fusion แล้ว ป้ายในภาพแก้เป็น F6) |
+| Home | ยังไม่ส่ง ยังไม่พบปุ่มเริ่มต้นของ Fusion (ป้ายในภาพเขียน Ctrl + Home ซึ่งยังไม่ยืนยัน) |
 | Visibility (แทน Zoom) | V |
 | Full Screen (แทน Pan) | Ctrl+Shift+F |
 | 4 Views (แทน Orbit) | Shift+1 |
@@ -210,7 +211,7 @@ $fqbn = 'esp32:esp32:waveshare_esp32_s3_touch_lcd_7:PSRAM=enabled,FlashSize=16M,
 ผล compile ล่าสุด (2026-09-18, RGB565 + grid 6 × 4 + jog pad + Slice/Clone + กล่อง VIEW รวม + sidebar หน้าย่อย):
 
 ```text
-Sketch uses 2238725 bytes (71%) of program storage space.
+Sketch uses 2238729 bytes (71%) of program storage space.
 Global variables use 89352 bytes (27%) of dynamic memory.
 ```
 
@@ -224,7 +225,7 @@ Global variables use 89352 bytes (27%) of dynamic memory.
 
 ## งานถัดไป
 
-1. Fusion: ยืนยันปุ่ม Home / Fit (ลอง F6) แล้วผูกและแก้ป้ายในภาพ และทดสอบปุ่ม S search กับ Fusion จริง
+1. Fusion: หาปุ่มของ Home view (ตอนนี้ยังไม่ผูก)
 2. สร้างหน้าโปรไฟล์ System
 3. หมุน/ย่อขยาย/ขยับแกน Z จากจอ (ต้องเพิ่ม HID Mouse หรือโปรแกรมฝั่ง PC)
 4. ใช้ช่องว่างที่เหลือ 1 ช่องในตาราง Orca
@@ -238,7 +239,7 @@ Global variables use 89352 bytes (27%) of dynamic memory.
 - ใช้งานจริงต้องเสียบช่อง Native USB (ส่ง HID) ส่วนช่อง UART ใช้แฟลชและดู log เท่านั้น เสียบทั้งสองช่องพร้อมกันได้
 - Native USB mux fix (`EXIO5 LOW`): implement แล้วและใช้งานได้
 - COM13: USB-Enhanced-SERIAL CH343
-- Fusion 360: ผูกปุ่มครบทุกหน้าแล้ว (2026-09-18) ทดสอบการแตะผ่าน Serial ผ่านทุกปุ่ม ยังไม่ได้ทดสอบกับโปรแกรม Fusion จริง และ Home / Fit ยังรอยืนยัน
+- Fusion 360: ผูกปุ่มครบทุกหน้าแล้ว (2026-09-18) ทดสอบการแตะผ่าน Serial ผ่านทุกปุ่ม ผู้ใช้ยืนยันกับ Fusion จริงแล้วว่า F6 = Fit และปุ่ม S search พิมพ์ชื่อคำสั่งแล้วเรียกคำสั่งได้ เหลือ Home ที่ยังไม่ผูก
 - System: มีปุ่มใน bottom bar แต่ยังไม่มีหน้า profile
 - Sidebar Orca: ครบทั้ง 8 หน้า แฟลชและทดสอบสลับหน้าแล้ว (2026-09-18)
 - ไอคอนใหม่ 6 ตัว (Instance ±, Support, Fuzzy Skin, Color, Measure) วาดขึ้นเองด้วย SVG แล้วเรนเดอร์ด้วย Edge headless ไม่ได้นำไอคอนของ OrcaSlicer มาใช้ เพื่อเลี่ยงเงื่อนไขสัญญาอนุญาต AGPL
