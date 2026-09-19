@@ -1,187 +1,81 @@
 #pragma once
 
 #include <lvgl.h>
+#include <stddef.h>
+#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
+/* What a button does on the deck itself. Most buttons are MACRO_ACTION_KEYS:
+ * they only send their `keys` to the PC. */
 typedef enum {
-    MACRO_ACTION_NONE = 0,
-    MACRO_ACTION_NEW_DESIGN,
-    MACRO_ACTION_OPEN,
-    MACRO_ACTION_SAVE,
-    MACRO_ACTION_UNDO,
-    MACRO_ACTION_REDO,
-    MACRO_ACTION_LINE,
-    MACRO_ACTION_RECTANGLE,
-    MACRO_ACTION_CIRCLE,
-    MACRO_ACTION_ARC,
-    MACRO_ACTION_DIMENSION,
-    MACRO_ACTION_EXTRUDE,
-    MACRO_ACTION_REVOLVE,
-    MACRO_ACTION_FILLET,
-    MACRO_ACTION_CHAMFER,
-    MACRO_ACTION_SHELL,
-    MACRO_ACTION_MOVE,
-    MACRO_ACTION_COMBINE,
-    MACRO_ACTION_HOLE,
-    MACRO_ACTION_PATTERN,
-    MACRO_ACTION_MIRROR,
-    MACRO_ACTION_VIEW_HOME,
-    MACRO_ACTION_VIEW_FIT,
-    MACRO_ACTION_VIEW_ZOOM,
-    MACRO_ACTION_VIEW_PAN,
-    MACRO_ACTION_VIEW_ORBIT,
-    MACRO_ACTION_DISPLAY_SHADED,
-    MACRO_ACTION_DISPLAY_WIREFRAME,
-    MACRO_ACTION_DISPLAY_HIDDEN,
-    MACRO_ACTION_PROFILE_FUSION,
-    MACRO_ACTION_PROFILE_ORCA,
-    MACRO_ACTION_PROFILE_SYSTEM,
-    MACRO_ACTION_NAV_HOME,
-    MACRO_ACTION_NAV_SKETCH,
-    MACRO_ACTION_NAV_SOLID,
-    MACRO_ACTION_NAV_SURFACE,
-    MACRO_ACTION_NAV_MESH,
-    MACRO_ACTION_NAV_SHEET_METAL,
-    MACRO_ACTION_NAV_TOOLS,
-    MACRO_ACTION_NAV_SETTINGS,
-    MACRO_ACTION_ORCA_PREPARE,
-    MACRO_ACTION_ORCA_MODIFY,
-    MACRO_ACTION_ORCA_VIEW,
-    MACRO_ACTION_ORCA_SUPPORT,
-    MACRO_ACTION_ORCA_FILAMENT,
-    MACRO_ACTION_ORCA_PRINTER,
-    MACRO_ACTION_ORCA_TOOLS,
-    MACRO_ACTION_ORCA_SETTINGS,
-    MACRO_ACTION_ORCA_IMPORT_MODEL,
-    MACRO_ACTION_ORCA_ARRANGE,
-    MACRO_ACTION_ORCA_AUTO_ORIENT,
-    MACRO_ACTION_ORCA_LAY_FLAT,
-    MACRO_ACTION_ORCA_SPLIT_PARTS,
-    MACRO_ACTION_ORCA_ROTATE,
-    MACRO_ACTION_ORCA_SCALE,
-    MACRO_ACTION_ORCA_NEGATIVE_VOLUME,
-    MACRO_ACTION_ORCA_ADD_SUPPORT,
-    MACRO_ACTION_ORCA_SUPPORT_PAINTING,
-    MACRO_ACTION_ORCA_SUPPORT_BLOCKER,
-    MACRO_ACTION_ORCA_ADD_TEXT,
-    MACRO_ACTION_ORCA_SEAM_PAINTING,
-    MACRO_ACTION_ORCA_DELETE,
-    MACRO_ACTION_ORCA_SLICE,
-    MACRO_ACTION_ORCA_CLONE,
-    MACRO_ACTION_ORCA_SEND_TO_PRINTER,
-    MACRO_ACTION_ORCA_DISPLAY_PREPARE,
-    MACRO_ACTION_ORCA_DISPLAY_PREVIEW,
-    MACRO_ACTION_ORCA_DISPLAY_DEVICE,
-    MACRO_ACTION_ORCA_NEW_PROJECT,
-    MACRO_ACTION_ORCA_OPEN_PROJECT,
-    MACRO_ACTION_ORCA_SAVE_PROJECT,
-    MACRO_ACTION_ORCA_CUT,
-    MACRO_ACTION_ORCA_INSTANCE_ADD,
-    MACRO_ACTION_ORCA_INSTANCE_REMOVE,
-    MACRO_ACTION_ORCA_FUZZY_SKIN,
-    MACRO_ACTION_ORCA_COLOR_PAINTING,
-    MACRO_ACTION_ORCA_MEASURE,
-    MACRO_ACTION_ORCA_VIEW_DEFAULT,
-    MACRO_ACTION_ORCA_VIEW_TOP,
-    MACRO_ACTION_ORCA_VIEW_BOTTOM,
-    MACRO_ACTION_ORCA_VIEW_FRONT,
-    MACRO_ACTION_ORCA_VIEW_BEHIND,
-    MACRO_ACTION_ORCA_VIEW_LEFT,
-    MACRO_ACTION_ORCA_VIEW_RIGHT,
-    MACRO_ACTION_ORCA_VIEW_PREVIEW,
-    /* Jog pad: opened by the Move button, moves the selection with arrow keys. */
-    MACRO_ACTION_JOG_Y_PLUS,
-    MACRO_ACTION_JOG_Y_MINUS,
-    MACRO_ACTION_JOG_X_PLUS,
-    MACRO_ACTION_JOG_X_MINUS,
-    MACRO_ACTION_JOG_STEP_FINE,
-    MACRO_ACTION_JOG_STEP_COARSE,
+    MACRO_ACTION_KEYS = 0,   /* send `keys`, nothing else (the default) */
+    MACRO_ACTION_NONE,       /* placeholder, does nothing */
+    MACRO_ACTION_PROFILE,    /* switch to profile number `arg` */
+    MACRO_ACTION_PAGE,       /* open sidebar page `arg` (0 = the image page) */
+    MACRO_ACTION_JOG_OPEN,   /* open the jog pad, and send `keys` */
+    MACRO_ACTION_JOG_MOVE,   /* jog pad arrow, repeats while held */
+    MACRO_ACTION_JOG_STEP,   /* toggle the jog step between 10 mm and 1 mm */
     MACRO_ACTION_JOG_CLOSE,
-    /* Orca sidebar sub-pages. */
-    MACRO_ACTION_ORCA_MESH_BOOLEAN,
-    MACRO_ACTION_ORCA_ASSEMBLY,
-    MACRO_ACTION_ORCA_TOGGLE_PRINTABLE,
-    MACRO_ACTION_ORCA_SELECT_ALL,
-    MACRO_ACTION_ORCA_DESELECT,
-    MACRO_ACTION_ORCA_COPY,
-    MACRO_ACTION_ORCA_PASTE,
-    MACRO_ACTION_ORCA_CUT_CLIPBOARD,
-    MACRO_ACTION_ORCA_DELETE_ALL,
-    MACRO_ACTION_ORCA_BRIM_EARS,
-    MACRO_ACTION_ORCA_ZOOM_IN,
-    MACRO_ACTION_ORCA_ZOOM_OUT,
-    MACRO_ACTION_ORCA_TOGGLE_SIDEBAR,
-    MACRO_ACTION_ORCA_ONE_LAYER,
-    MACRO_ACTION_ORCA_GCODE_WINDOW,
-    MACRO_ACTION_ORCA_SLIDER_UP,
-    MACRO_ACTION_ORCA_SLIDER_DOWN,
-    MACRO_ACTION_ORCA_SLIDER_LEFT,
-    MACRO_ACTION_ORCA_SLIDER_RIGHT,
-    MACRO_ACTION_ORCA_SLIDER_HOME,
-    MACRO_ACTION_ORCA_SLIDER_END,
-    MACRO_ACTION_ORCA_FILAMENT_1,
-    MACRO_ACTION_ORCA_FILAMENT_2,
-    MACRO_ACTION_ORCA_FILAMENT_3,
-    MACRO_ACTION_ORCA_FILAMENT_4,
-    MACRO_ACTION_ORCA_FILAMENT_5,
-    MACRO_ACTION_ORCA_FILAMENT_6,
-    MACRO_ACTION_ORCA_FILAMENT_7,
-    MACRO_ACTION_ORCA_FILAMENT_8,
-    MACRO_ACTION_ORCA_FILAMENT_9,
-    MACRO_ACTION_ORCA_PRINT_PLATE,
-    MACRO_ACTION_ORCA_EXPORT_GCODE,
-    MACRO_ACTION_ORCA_SAVE_AS,
-    MACRO_ACTION_ORCA_SHORTCUT_LIST,
-    MACRO_ACTION_ORCA_3DCONNEXION,
-    MACRO_ACTION_ORCA_PREFERENCES,
-    MACRO_ACTION_ORCA_SWITCH_TAB,
-    /* Fusion 360: right panel replacements and sidebar sub-pages. */
-    MACRO_ACTION_FUSION_VISIBILITY,
-    MACRO_ACTION_FUSION_FULLSCREEN,
-    MACRO_ACTION_FUSION_VIEWPORTS,
-    MACRO_ACTION_FUSION_NEXT_WORKSPACE,
-    MACRO_ACTION_FUSION_TRIM,
-    MACRO_ACTION_FUSION_OFFSET,
-    MACRO_ACTION_FUSION_PROJECT,
-    MACRO_ACTION_FUSION_CONSTRUCTION,
-    MACRO_ACTION_FUSION_SKETCH_FILLET,
-    MACRO_ACTION_FUSION_PRESS_PULL,
-    MACRO_ACTION_FUSION_JOINT,
-    MACRO_ACTION_FUSION_PATCH,
-    MACRO_ACTION_FUSION_STITCH,
-    MACRO_ACTION_FUSION_UNSTITCH,
-    MACRO_ACTION_FUSION_THICKEN,
-    MACRO_ACTION_FUSION_SURFACE_TRIM,
-    MACRO_ACTION_FUSION_INSERT_MESH,
-    MACRO_ACTION_FUSION_CONVERT_MESH,
-    MACRO_ACTION_FUSION_REDUCE,
-    MACRO_ACTION_FUSION_REMESH,
-    MACRO_ACTION_FUSION_FLANGE,
-    MACRO_ACTION_FUSION_UNFOLD,
-    MACRO_ACTION_FUSION_REFOLD,
-    MACRO_ACTION_FUSION_FLAT_PATTERN,
-    MACRO_ACTION_FUSION_SHEET_RULES,
-    MACRO_ACTION_FUSION_MEASURE,
-    MACRO_ACTION_FUSION_APPEARANCE,
-    MACRO_ACTION_FUSION_SECTION,
-    MACRO_ACTION_FUSION_INTERFERENCE,
-    MACRO_ACTION_FUSION_REPEAT,
-    MACRO_ACTION_FUSION_BROWSER,
-    MACRO_ACTION_FUSION_DATA_PANEL,
-    MACRO_ACTION_FUSION_VIEWCUBE,
-    MACRO_ACTION_FUSION_RESET_LAYOUT,
 } macro_action_t;
 
-typedef void (*macro_deck_action_cb_t)(macro_action_t action, void *user_data);
+/* One button. Only the first three fields are required:
+ *
+ *   {LV_SYMBOL_SAVE, "Save", "Ctrl+S"}
+ *
+ * keys is written the way you would say it:
+ *   "Ctrl+Shift+G", "Del", "F6", "Shift+Tab", "+", "search:Revolve"
+ * Modifiers: Ctrl, Shift, Alt, Win. Named keys: Del, Esc, Tab, Enter, Space,
+ * Backspace, Home, End, PgUp, PgDn, Up, Down, Left, Right, F1-F12.
+ * "search:NAME" presses S, types NAME and presses Enter (Fusion command search).
+ *
+ * icon and accent are only drawn on sidebar pages; on image pages the picture
+ * shows the button. */
+typedef struct {
+    const char *icon;        /* LV_SYMBOL_* or short text */
+    const char *label;
+    const char *keys;        /* NULL = send nothing */
+    uint32_t accent;         /* icon colour on sidebar pages, 0 = default */
+    macro_action_t action;   /* default MACRO_ACTION_KEYS */
+    uint8_t arg;             /* profile / page index for PROFILE and PAGE */
+} macro_button_t;
 
-/** Build and load the 800x480 switchable control-deck screen. */
-void macro_deck_ui_create(macro_deck_action_cb_t action_cb, void *user_data);
+/* A touch area placed over a button painted in the background image. */
+typedef struct {
+    lv_coord_t x, y, w, h;
+    macro_button_t button;
+} macro_zone_t;
 
-/** Update the clock shown in the header. Strings are copied by LVGL. */
-void macro_deck_ui_set_clock(const char *date, const char *time);
+/* A sidebar page drawn by LVGL on top of the image grid. */
+typedef struct {
+    const char *title;
+    const char *hint;
+    const macro_button_t *buttons;
+    uint8_t count;
+    uint8_t cols;
+} macro_page_t;
+
+typedef struct {
+    const char *name;
+    const uint16_t *image;          /* 800x480 RGB565, see tools/png_to_rgb565.py */
+    const macro_zone_t *zones;
+    size_t zone_count;
+    const macro_page_t *pages;      /* pages[0] is the image page and is never drawn */
+    size_t page_count;
+    uint32_t highlight_fill;        /* sidebar highlight colours */
+    uint32_t highlight_border;
+} macro_profile_t;
+
+/* Defined in macro_deck_profiles.c */
+extern const macro_profile_t macro_profiles[];
+extern const size_t macro_profile_count;
+
+typedef void (*macro_deck_button_cb_t)(const macro_button_t *button, void *user_data);
+
+/** Build and load the 800x480 control-deck screen. */
+void macro_deck_ui_create(macro_deck_button_cb_t button_cb, void *user_data);
 
 /** Return the root screen, or NULL before macro_deck_ui_create(). */
 lv_obj_t *macro_deck_ui_get_screen(void);

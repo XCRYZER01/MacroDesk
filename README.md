@@ -14,21 +14,26 @@ shortcut, so the PC needs no driver and no companion app.
 - **Two profiles**, switched from the bottom bar: OrcaSlicer and Fusion 360.
 - **OrcaSlicer**: a 6 × 4 grid of 23 tools, a Slice Plate button, eight camera
   views, and a jog pad that moves the selected model 10 mm or 1 mm per tap.
-- **Fusion 360**: sketch and solid tools, visual styles, Fit (F6), workspace
-  switching. Commands with no default shortcut, such as Revolve or Shell, are
-  typed into Fusion's `S` command search automatically.
-- **Sidebar sub-pages** on both profiles: seven extra pages each, for example
+- **Fusion 360**: sketch and solid tools, visual styles, Fit (F6) and more.
+  Commands with no default shortcut, such as Revolve or Shell, are typed into
+  Fusion's `S` command search automatically.
+- **Sidebar pages** on both profiles: seven extra pages each, for example
   Modify, Filament (set filament 1–9) and Printer (Print Plate, Export G-code)
   on Orca, and Sketch, Solid, Surface, Mesh and Sheet Metal on Fusion.
-- Plug-and-play USB HID keyboard, with no driver or companion app. The shortcuts are the
-  Windows/Linux ones (`Ctrl`). On macOS most of them would need `Cmd` instead.
+- **Easy to customize**: every button is one line of text in one file, for
+  example `{LV_SYMBOL_SAVE, "Save", "Ctrl+S"}`.
+- Plug-and-play USB keyboard with no driver or companion app. The shortcuts are
+  the Windows/Linux ones (`Ctrl`). On macOS most of them would need `Cmd`.
 
 ## Hardware
 
 | Part | Notes |
 |---|---|
-| Waveshare ESP32-S3-Touch-LCD-7 | 800 × 480 RGB LCD, GT911 capacitive touch, 16 MB flash, 8 MB PSRAM |
+| [Waveshare ESP32-S3-Touch-LCD-7](https://www.waveshare.com/esp32-s3-touch-lcd-7.htm?sku=27078) | 800 × 480 RGB LCD, GT911 capacitive touch, 16 MB flash, 8 MB PSRAM |
 | 2 × USB-C data cables | One for the keyboard, one for flashing and logs |
+
+The product link goes to Waveshare's own store. It is not an affiliate link,
+and this project is not sponsored by Waveshare.
 
 The board has **two USB-C ports**, and they do different things:
 
@@ -45,7 +50,32 @@ needed.
 > boot to route them to USB. Without that step Windows never sees the keyboard,
 > even though TinyUSB reports that it started.
 
-## Getting started
+## Quick start: flash the ready-made firmware
+
+No Arduino setup is needed for this path.
+
+1. Download
+   [`firmware/prebuilt/MacroDesk-esp32s3-touch-lcd-7.bin`](firmware/prebuilt/MacroDesk-esp32s3-touch-lcd-7.bin).
+2. Connect the board's `USB TO UART` port to the PC.
+3. Flash the file at address **0x0** with either tool:
+   - **In the browser** (Chrome or Edge): open Espressif's
+     [esptool-js](https://espressif.github.io/esptool-js/) web flasher,
+     click *Connect*, pick the COM port, set the flash address to `0x0`, choose
+     the `.bin` file and click *Program*.
+   - **Command line**:
+
+     ```sh
+     pip install esptool
+     python -m esptool --chip esp32s3 --port <COM port> --baud 921600 write_flash 0x0 MacroDesk-esp32s3-touch-lcd-7.bin
+     ```
+
+4. Press the board's reset button, then plug the native `USB` port into the PC
+   you want to control.
+
+The file is a single image containing the bootloader, partition table and app.
+After changing the firmware, regenerate it with `python tools/make_prebuilt.py`.
+
+## Building from source
 
 ### 1. Toolchain
 
@@ -109,9 +139,8 @@ USB HID keyboard ready (EXIO5 LOW)
 Macro Deck UI ready
 ```
 
-Every tap prints the action it triggered, for example
-`Touch action: Orca View Top (78)`, which is the quickest way to check touch
-zones.
+Every tap prints what it did, for example `Touch: Fit -> F6`, which is the
+quickest way to check touch zones.
 
 ## Using it
 
@@ -132,105 +161,129 @@ Notes:
 - **Fusion `S search` buttons** need Fusion's user interface in English, because
   they type the command name.
 
-## How the firmware is put together
+## Customizing
 
-```text
-firmware/MacroDeckUI/
-├── MacroDeckUI.ino          board + USB bring-up, keyboard shortcut tables
-├── macro_deck_ui.h          macro_action_t: one enum value per button
-├── macro_deck_ui.c          screen, touch zones, sub-pages, jog pad
-├── ui_orca_rgb565.c         Orca background image as a C array (generated)
-├── ui_reference_rgb565.c    Fusion background image as a C array (generated)
-├── assets/                  editable 800×480 PNG sources of the backgrounds
-├── esp_lv_adapter_arduino.* LVGL display/touch adapter (from Waveshare)
-└── esp_panel_board_custom_conf.h   board pin/timing config (from Waveshare)
-tools/png_to_rgb565.py       PNG → C array converter
+### Change what a button does, or add a button
+
+**Every button lives in
+[`firmware/MacroDeckUI/macro_deck_profiles.c`](firmware/MacroDeckUI/macro_deck_profiles.c).**
+You don't need to touch any other file.
+
+A button is `{icon, label, keys}`, and `keys` is written the way you would say
+it:
+
+```c
+{LV_SYMBOL_SAVE, "Save", "Ctrl+S"}
+{"P", "Print Plate", "Ctrl+Shift+G"}
+{LV_SYMBOL_IMAGE, "Fit", "F6"}
+{"R", "Revolve", "search:Revolve"}   // Fusion: press S, type "Revolve", Enter
 ```
 
-The screen has three layers:
+| In `keys` | Meaning |
+|---|---|
+| `Ctrl+`, `Shift+`, `Alt+`, `Win+` | Modifiers, in any combination |
+| a single character: `A`, `5`, `+`, `?`, `]` | That key |
+| `Del`, `Esc`, `Tab`, `Enter`, `Space`, `Backspace`, `Home`, `End`, `PgUp`, `PgDn`, `Up`, `Down`, `Left`, `Right`, `F1`–`F12` | Named keys |
+| `search:Name` | Fusion command search: presses `S`, types `Name`, presses Enter |
 
-1. **Background image.** Each profile is one full-screen 800 × 480 picture
-   drawn by a designer, stored as an RGB565 array in flash and copied into a
-   PSRAM canvas with `memcpy` when the profile changes.
-2. **Invisible touch zones ("hotspots").** Transparent LVGL buttons placed
-   exactly over the buttons painted in the image. They only highlight while
-   pressed. This is why a button's position in the image and its coordinates in
-   `macro_deck_ui.c` must match.
-3. **LVGL overlays.** Real LVGL widgets on top: the sidebar highlight, the
-   sub-pages and the jog pad. Sub-pages are built when opened and deleted when
-   closed, because the LVGL heap is small.
+An optional 4th field sets the icon colour on sidebar pages, for example
+`{"B", "Mesh Boolean", "B", 0x55BFFF}`. If a key string is wrong, the serial log
+prints `Unknown key ...`.
 
-A tap flows like this:
+There are two kinds of buttons:
 
-```text
-touch → hotspot (action_spec_t) → action_event_cb() → on_macro_action() in the .ino
-      → send_orca_shortcut() / send_fusion_shortcut() → USB HID keyboard
-```
+- **Sidebar-page buttons** (`orca_modify[]`, `fusion_solid[]` and so on) are
+  drawn by LVGL. Add, remove or reorder lines and the page redraws itself. No
+  artwork or coordinates are needed.
+- **Buttons on the main image pages** (`orca_zones[]`, `fusion_zones[]`) are
+  invisible touch areas placed over a button painted in the background PNG.
+  Each line has a rectangle, for example `{ORCA_CELL(2, 1), {...}}` for
+  column 2, row 1. If you change the picture, keep the rectangles on top of the
+  painted buttons.
 
-## Changing a background
+To check where every touch area is, run `python tools/make_layout_guides.py`.
+It draws the rectangles over the artwork:
 
-1. Edit the PNG in `firmware/MacroDeckUI/assets/`. It must stay **exactly
-   800 × 480**. Any editor works: Figma, Photoshop, GIMP and so on.
-2. Convert it:
+| Orca touch areas | Fusion touch areas |
+|---|---|
+| ![Orca layout guide](templates/layout_guide_orca.png) | ![Fusion layout guide](templates/layout_guide_fusion.png) |
+
+### Change a background, or design your own
+
+1. Start from the brand-free template
+   [`templates/deck_template_800x480.svg`](templates/deck_template_800x480.svg)
+   (Figma, Inkscape and Illustrator can open it), or edit the existing PNG in
+   `firmware/MacroDeckUI/assets/`. Every box in the template sits exactly on a
+   touch-area rectangle that already exists in the code.
+
+   ![Deck template](templates/deck_template_800x480.png)
+
+2. Export an **800 × 480** PNG into `firmware/MacroDeckUI/assets/`.
+3. Convert it to the C array the firmware embeds:
 
    ```sh
    pip install pillow
    python tools/png_to_rgb565.py firmware/MacroDeckUI/assets/ui_orca_800x480.png
    ```
 
-   This rewrites `firmware/MacroDeckUI/ui_orca_rgb565.c`. Use `--name` and
-   `--out` for a new image.
-3. If you moved, resized or added buttons in the picture, update their
-   touch-zone coordinates in `macro_deck_ui.c` (next section).
-4. Build and flash.
+   This rewrites `firmware/MacroDeckUI/ui_orca_rgb565.c`. For a new image,
+   `--name ui_myapp` produces `ui_myapp_rgb565.c` with the symbol
+   `ui_myapp_rgb565[]`.
+4. Point the profile at the image in `macro_profiles[]` at the bottom of
+   `macro_deck_profiles.c`, then update the touch-area rectangles if buttons
+   moved.
+5. Build and flash.
 
-Things to know:
+Each image uses 768,000 bytes (800 × 480 × 2) of the 3 MB app partition. The
+sketch uses about 71% today, so about one more full-screen image fits. For
+more, pick a larger app partition, or load images from the FAT partition or SD
+card into PSRAM at boot.
 
-- Each image is 768,000 bytes (800 × 480 × 2) of the 3 MB app partition. The
-  sketch currently uses about 71%, so about one more full-screen image fits.
-  For more, switch to a larger app partition, or load images from the FAT
-  partition or the SD card into PSRAM at boot.
-- If red and blue come out swapped on the panel, `LV_COLOR_16_SWAP` does not
-  match. The converter writes plain little-endian RGB565 for
-  `LV_COLOR_16_SWAP 0`.
-- Coordinates of the current layout:
+### Add a whole new profile (for example Blender)
 
-  | Area | Position (x, y) and size |
-  |---|---|
-  | Orca grid 6 × 4 | x = 134 + col × 80, y = 88 + row × 85, 76 × 82 |
-  | Fusion grid 5 × 4 | x = 133 + col × 97, y = 88 + row × 85, 93 × 82 |
-  | Sidebar rows | x 4, y = 84 + row × 42, 123 × 41 |
-  | Orca view panel 3 × 3 | x = 626 + col × 54, y = 186 + row × 70, 52 × 64 |
-  | Orca Slice Plate / Fusion workspace box | (620, 88), 168 × 63 |
-  | Sub-page area | (131, 84), 486 × 344 |
-  | Bottom bar | Fusion (78, 432), Orca (208, 432), System (337, 432), height 40 |
+1. Design an 800 × 480 background from the template and convert it (see above).
+2. In `macro_deck_profiles.c`, copy the Orca block: a `*_zones[]` array, the
+   page arrays and a `*_pages[]` list. Rename them and fill in the keys.
+3. Add an entry to `macro_profiles[]` and give it a bottom-bar button with
+   `MACRO_ACTION_PROFILE` and its index (the "System" slot is free).
 
-## Adding or changing a button
+## How the firmware is put together
 
-Example: an Orca "Print Plate" button in the empty grid slot.
+```text
+firmware/MacroDeckUI/
+├── macro_deck_profiles.c    ALL buttons, pages and touch areas  ← edit this
+├── macro_deck_ui.h          button / zone / page / profile types
+├── macro_deck_ui.c          engine: touch areas, sidebar pages, jog pad, profiles
+├── MacroDeckUI.ino          board + USB bring-up, turns "Ctrl+S" into key presses
+├── ui_*_rgb565.c            background images as C arrays (generated, don't edit)
+├── assets/                  800 × 480 PNG sources of the backgrounds
+├── esp_lv_adapter_arduino.* LVGL display/touch adapter (from Waveshare)
+└── esp_panel_board_custom_conf.h   board pin/timing config (Espressif, Apache-2.0)
+firmware/prebuilt/           ready-to-flash .bin
+templates/                   design template and layout guides
+tools/png_to_rgb565.py       PNG → C array converter
+tools/make_layout_guides.py  draws the touch areas over the artwork
+tools/make_prebuilt.py       rebuilds the ready-to-flash .bin from the build output
+CLAUDE.md                    project notes for AI coding assistants
+```
 
-1. **Action** – add a value to `macro_action_t` in `macro_deck_ui.h`, or reuse
-   one that already exists (`MACRO_ACTION_ORCA_PRINT_PLATE` does).
-2. **Touch zone** – in `macro_deck_ui.c`, add an `action_spec_t` to the
-   `orca_actions[]` list. Entries map to grid cells in reading order, so the
-   24th entry becomes the bottom-right cell.
+The screen has three layers:
 
-   ```c
-   {LV_SYMBOL_UPLOAD, "Print Plate", "Ctrl + Shift + G", MACRO_ACTION_ORCA_PRINT_PLATE, 0x31C8F5},
-   ```
+1. **Background image.** Each profile is one full-screen 800 × 480 picture,
+   stored as an RGB565 array in flash and copied into a PSRAM canvas when the
+   profile changes.
+2. **Invisible touch areas.** Transparent LVGL buttons placed over the buttons
+   painted in the image. They only highlight while pressed.
+3. **LVGL overlays.** The sidebar highlight, the sidebar pages and the jog pad.
+   Sidebar pages are built when opened and deleted when closed, because the
+   LVGL heap is small.
 
-   For a button outside a grid, call `make_hotspot(parent, &spec, x, y, w, h)`.
-   The icon, label and colour of an `action_spec_t` are only drawn on
-   sub-pages. On image pages the picture shows the button.
-3. **Key** – in `MacroDeckUI.ino`, map the action in `send_orca_shortcut()` or
-   `send_fusion_shortcut()` with `hid_tap(key)`, `hid_combo(mod, key)` or
-   `hid_combo3(mod1, mod2, key)`. For a Fusion command without a shortcut, add
-   its name to `fusion_search_term()` instead.
-4. Optionally add a readable name in `action_name()` for the serial log.
-5. Paint the button into the PNG and convert it (see above).
+A tap flows like this:
 
-Sub-page buttons need no image work. Add an entry to the page's list in
-`orca_page_def()` or `fusion_page_def()` and it is drawn automatically.
+```text
+touch → macro_button_t → engine (page / profile / jog pad) → on_button() in the .ino
+      → send_keys("Ctrl+S") → USB HID keyboard
+```
 
 ## Keyboard mapping sources
 
@@ -240,15 +293,12 @@ Sub-page buttons need no image work. Add an entry to the page's list in
   `GLCanvas3D.cpp`, `Gizmos/GLGizmo*.cpp`).
 - Fusion 360: default shortcuts; Fit = F6 was confirmed on a real install.
 
-The full per-button tables are in `send_orca_shortcut()`,
-`send_fusion_shortcut()` and `fusion_search_term()`.
-
 ## Memory
 
 - **LVGL heap (`LV_MEM_SIZE`, 48 KB)** is the tightest limit. The largest
-  sub-page (12 buttons) brings it to about 81% used. The firmware prints
+  sidebar page (12 buttons) brings it to about 80% used. The firmware prints
   `LVGL heap: …` on every page switch, so watch that line when adding buttons.
-- **Flash**: the sketch uses about 2.24 MB of the 3 MB app partition.
+- **Flash**: the sketch uses about 2.23 MB of the 3 MB app partition.
 - **PSRAM** holds the framebuffers and the 768 KB background canvas.
 
 ## Limitations and ideas
@@ -269,16 +319,28 @@ The full per-button tables are in `send_orca_shortcut()`,
 | Windows does not list the keyboard | Use a data cable on the native port. Check the log for `USB HID keyboard ready (EXIO5 LOW)`. |
 | Board reboot loop at start | PSRAM is not enabled in the board settings. |
 | Red and blue swapped | `LV_COLOR_16_SWAP` must be `0`, or regenerate the images to match. |
-| A button reacts in the wrong place | Its hotspot coordinates don't match the picture. Tap it and read the serial log. |
-| Crash after adding many sub-page buttons | The LVGL heap is out of memory. Check the `LVGL heap` log line. |
+| A button reacts in the wrong place | Its touch area doesn't match the picture. Run `tools/make_layout_guides.py`, or tap it and read the serial log. |
+| `Unknown key ...` in the log | A `keys` string has a typo. See the table under *Customizing*. |
+| Crash after adding many sidebar-page buttons | The LVGL heap is out of memory. Check the `LVGL heap` log line. |
 
-## Credits
+## Stuck? Ask Claude
 
-- Display/touch adapter and board configuration are based on the official
-  Waveshare ESP32-S3-Touch-LCD-7 LVGL 8 example.
-- Built on [LVGL](https://lvgl.io), Espressif's
-  [ESP32_Display_Panel](https://github.com/esp-arduino-libs/ESP32_Display_Panel)
-  and the Arduino-ESP32 core.
+This repository includes a [`CLAUDE.md`](CLAUDE.md) that explains the project
+to AI coding assistants. You don't need to know C to customize or fix the deck:
+
+1. Install [Claude Code](https://claude.com/claude-code) and open this folder in
+   it (in a terminal run `claude`, or use the VS Code extension).
+2. Describe what you want in plain words, in any language, for example:
+   - "Add a Blender profile with buttons for Grab, Rotate, Scale and Extrude."
+   - "Change the Orca Delete button to send Ctrl+Delete."
+   - "My deck resets when I open the Filament page. Here is the serial log: …"
+   - "Flash the firmware to COM5."
+3. Paste the serial monitor output when something goes wrong. It shows every tap
+   and most errors.
+
+Claude reads `CLAUDE.md` first, so it already knows the board quirks, how to
+build and flash, and where the buttons are defined.
+
 ## License
 
 MacroDesk is licensed under the **GNU General Public License v3.0**. See
@@ -298,3 +360,11 @@ sponsored by Autodesk, Inc., the OrcaSlicer project, Bambu Lab, Waveshare or
 Espressif. Fusion 360, Autodesk and all other product names and logos shown in
 the screenshots and artwork belong to their respective owners and are used
 only to identify the software the deck controls.
+
+## Credits
+
+- Display/touch adapter and board configuration are based on the official
+  Waveshare ESP32-S3-Touch-LCD-7 LVGL 8 example.
+- Built on [LVGL](https://lvgl.io), Espressif's
+  [ESP32_Display_Panel](https://github.com/esp-arduino-libs/ESP32_Display_Panel)
+  and the Arduino-ESP32 core.

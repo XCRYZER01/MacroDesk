@@ -1,6 +1,7 @@
 # Arduino build artifacts
 firmware/MacroDeckUI/build/
 *.bin
+!firmware/prebuilt/*.bin
 *.elf
 *.map
 
