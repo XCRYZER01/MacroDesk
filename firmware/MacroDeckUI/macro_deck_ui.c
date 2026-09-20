@@ -332,6 +332,26 @@ static void paint_text(lv_coord_t x, lv_coord_t y, lv_coord_t w,
     lv_canvas_draw_text(s_canvas, x, y, w, &dsc, text);
 }
 
+/* The card face itself. The artwork used to carry these shapes, which meant a
+ * zone was only ever as accurate as the picture behind it -- Blender's sidebar
+ * was painted at a 45px pitch while the deck template places rows every 42px,
+ * so the further down the screen you looked the further the touch target sat
+ * from the button you could see. Drawing the card here ties what you see to
+ * what you touch by construction, for any artwork, including one a user
+ * uploads. */
+static void paint_card(const macro_zone_t *zone, bool dead)
+{
+    lv_draw_rect_dsc_t dsc;
+    lv_draw_rect_dsc_init(&dsc);
+    dsc.radius = zone->h < 50 ? 7 : 8;
+    dsc.bg_color = C_HEX(COLOR_CARD);
+    dsc.bg_opa = LV_OPA_COVER;
+    dsc.border_color = C_HEX(dead ? 0x18242B : 0x1D2B34);
+    dsc.border_width = 1;
+    dsc.border_opa = LV_OPA_COVER;
+    lv_canvas_draw_rect(s_canvas, zone->x, zone->y, zone->w, zone->h, &dsc);
+}
+
 static void paint_zone(const macro_zone_t *zone)
 {
     const macro_button_t *button = &zone->button;
@@ -339,6 +359,7 @@ static void paint_zone(const macro_zone_t *zone)
 
     const bool dead = button->action == MACRO_ACTION_NONE;
     const uint32_t colour = dead ? COLOR_MUTED : COLOR_TEXT;
+    paint_card(zone, dead);
     const lv_font_t *label_font = zone->w >= 110 ? &lv_font_montserrat_14 : &lv_font_montserrat_12;
     const lv_coord_t lh = (lv_coord_t)lv_font_get_line_height(label_font);
     const lv_coord_t sh = (lv_coord_t)lv_font_get_line_height(&lv_font_montserrat_12);
