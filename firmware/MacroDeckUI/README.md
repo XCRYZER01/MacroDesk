@@ -12,6 +12,9 @@ Quick reference:
   `16M Flash (3MB APP/9.9MB FATFS)` partition scheme.
 - Flash through the `USB TO UART` port. The keyboard output comes from the
   native `USB` port.
+- The Studio's **Send to device** button stores `/macrodesk.bin` in FAT over
+  the `USB TO UART` port at 921600 baud. A valid runtime bundle overrides the
+  built-in profiles; missing or invalid data falls back safely.
 - Buttons, pages and touch areas are all in `macro_deck_profiles.c`.
 - `ui_*_rgb565.c` are generated from `assets/*.png` with
   `tools/png_to_rgb565.py`. Don't edit them by hand.

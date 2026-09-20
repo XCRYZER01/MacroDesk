@@ -15,34 +15,43 @@ supports:
   enabled state and drag-to-reorder;
 - dragging buttons to swap positions;
 - automatic browser-local saves;
-- importing and exporting versioned `.macrodesk` JSON bundles.
+- importing and exporting versioned `.macrodesk` JSON bundles;
+- installing the current project directly to a runtime-enabled board over Web
+  Serial, including both RGB565 backgrounds.
 
 The preview follows the original application artwork: OrcaSlicer and PrusaSlicer
 use a 6 x 4 main grid, while Fusion 360 retains its original 5 x 4 main grid and
 full-height right panel. Every layout also includes eight sidebar rows and the
 bottom profile bar.
 
-Open `index.html` directly, or serve the repository root with any static web
-server.
+Open `index.html` directly for preview/editing only. **Send to device** must run
+from `http://localhost` or HTTPS; opening the Studio as `file://` makes built-in
+backgrounds cross-origin to Canvas and Web Serial is not consistently available.
+Serve the repository root with any static web server, for example:
+
+```sh
+python -m http.server 8000      # then open http://localhost:8000/web/
+npx serve .                     # or any other static server
+```
 
 ## Getting a deck onto the board
 
-The firmware still reads its buttons from C, so a bundle reaches the board by
-way of a rebuild:
+Flash the bundled runtime-enabled firmware once with `flash.html`. After that,
+the normal workflow is entirely in the Studio:
 
-```sh
-py tools/macrodesk_to_c.py my-deck.macrodesk      # writes macro_deck_profiles.c
-arduino-cli compile --fqbn <fqbn> firmware/MacroDeckUI
-python tools/make_prebuilt.py                     # refresh firmware/prebuilt/
-# then flash with web/flash.html
-```
+1. customize the two profiles;
+2. click **Send to device**;
+3. choose the `USB TO UART` serial port;
+4. wait for the transfer and automatic restart.
 
-What the tool cannot do yet, and says so rather than guessing:
+The Studio renders each background to RGB565 in the browser, packs the layout
+and button strings into a versioned CRC32 bundle, and stores it as
+`/macrodesk.bin` in the board's FAT partition. Invalid data never replaces the
+working file, and firmware falls back to its compiled profiles if loading fails.
 
-- an uploaded background has no RGB565 array; run `tools/png_to_rgb565.py` on
-  the PNG first, and check the zone rectangles still sit over its buttons
-- a right sidebar other than 3 x 3 has no rectangles in the artwork
-- the `text` action has no firmware equivalent and becomes a dead key
+The old `.macrodesk` → C converter remains available for reproducible compiled
+builds. Uploaded bitmap icons are not rendered by firmware yet; during device
+transfer they fall back to the button's text icon.
 
 Page 1 keeps the artwork's grid. Pages 2 to 8 are drawn by LVGL at runtime and
 hold twelve keys, which is roughly what the board's 48 KB LVGL heap can draw;
@@ -52,12 +61,13 @@ only the keys up to the last one in use are compiled in.
 
 `flash.html` writes the firmware to the board from the browser over Web Serial,
 using [esptool-js](https://github.com/espressif/esptool-js). It flashes the
-merged image in `firmware/prebuilt/` at `0x0`, or any `.bin` you compiled
+merged image in root `prebuilt/` at `0x0`, or any `.bin` you compiled
 yourself, and keeps the flash mode, frequency and size recorded in the image's
 own bootloader header.
 
-Unlike the editor, the flasher **cannot run from a `file://` path**: browsers
-only expose USB devices on `https://` or `http://localhost`. Serve the
+Like the Studio's **Send to device** flow, the flasher **cannot run from a
+`file://` path**: browsers only expose USB devices on `https://` or
+`http://localhost`. Serve the
 repository root first, for example:
 
 ```sh
@@ -69,12 +79,12 @@ It needs Chrome or Edge; Safari, Firefox and mobile browsers have no Web Serial.
 Flashing a real board this way is confirmed working: 2,301,952 bytes at `0x0`
 in about 12 seconds at 921600 baud.
 Connect the cable to the port marked `USB TO UART`, not the native `USB` port —
-the native one is the keyboard the PC sees after the board boots. Device transfer is intentionally not presented as working yet: the
-firmware still needs a runtime profile loader and a serial transfer protocol.
+the native one is the keyboard the PC sees after the board boots.
 
-The built-in backgrounds contain only framing, colour and header photography.
-Button cards, labels, shortcuts and icons are rendered by the configurator, so
-they are never duplicated when a user customizes a profile.
+The built-in backgrounds contain only header and non-interactive bottom-right
+artwork over a neutral dark field. Button cards, panels, footer controls, labels,
+shortcuts and icons are rendered by the configurator, so they are never duplicated
+when a user customizes a profile.
 
 Choose **Right sidebar** in the button-area tabs, or click a sidebar key in the
 preview, to edit that key's label, action, shortcut, icon, colour and enabled

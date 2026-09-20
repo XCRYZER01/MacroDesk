@@ -94,8 +94,10 @@ def button_body(button, warnings, where, with_accent):
     if action == "search":
         return f"{label}, {c_string('search:' + value)}, {accent}"
     if action == "text":
-        warnings.append(f"{where}: action \"text\" has no firmware equivalent; sent as no action")
-        return f"{label}, NULL, {accent}, MACRO_ACTION_NONE"
+        if not value:
+            warnings.append(f"{where}: no text set; sent as no action")
+            return f"{label}, NULL, {accent}, MACRO_ACTION_NONE"
+        return f"{label}, {c_string(value)}, {accent}, MACRO_ACTION_TEXT"
     if not value:
         warnings.append(f"{where}: no shortcut set; sent as no action")
         return f"{label}, NULL, {accent}, MACRO_ACTION_NONE"
@@ -105,6 +107,14 @@ def button_body(button, warnings, where, with_accent):
 def zone(rect, button, warnings, where):
     # Zones are painted by the firmware now, so their accent colours the icon.
     return f"    {{{rect}, {{{icon_literal(button)}, {button_body(button, warnings, where, True)}}}}},"
+
+
+def is_unmapped_button(button):
+    return (
+        not button.get("enabled", False)
+        or button.get("action") == "none"
+        or not str(button.get("value") or "").strip()
+    )
 
 
 def image_symbol(profile, warnings):
@@ -161,10 +171,15 @@ def render_zones(profile, index, warnings):
         lines.append(zone("620, 88, 168, 63", profile["quickAction"], warnings, f"{profile['id']} quick action"))
     top, height = (186, 64) if quick else (128, 84)
     pitch_y = 70 if quick else 90
-    for slot, button in enumerate(profile["panelButtons"][:PANEL_SLOTS]):
+    panel_buttons = profile["panelButtons"][:PANEL_SLOTS]
+    panel_buttons = sorted(panel_buttons, key=is_unmapped_button)
+    for slot, button in enumerate(panel_buttons):
         col, row = slot % 3, slot // 3
         rect = f"{626 + col * 54}, {top + row * pitch_y}, 52, {height}"
-        lines.append(zone(rect, button, warnings, f"{profile['id']} panel {slot + 1}"))
+        panel_button = button
+        if is_unmapped_button(button):
+            panel_button = dict(button, label="", icon="")
+        lines.append(zone(rect, panel_button, warnings, f"{profile['id']} panel {slot + 1}"))
     lines.append("")
     lines.append("    BOTTOM_BAR,")
     lines.append("};")
@@ -231,14 +246,20 @@ def generate(bundle, source_name):
         zone_names.append(name)
         out += ["/* " + "=" * 70 + " */", f"/*  {profile['name']}", " */", block, "", render_pages(profile, warnings), ""]
 
-    out.append("const macro_profile_t macro_profiles[] = {")
+    out.append("const macro_profile_t macro_builtin_profiles[] = {")
     for index, profile in enumerate(profiles):
         out.append(
             f"    [PROFILE_{ids[index].upper()}] = {{{c_string(profile['name'])}, "
             f"{image_symbol(profile, [])}, {zone_names[index]}, COUNT({zone_names[index]}),\n"
             f"                     {profile['id']}_pages, COUNT({profile['id']}_pages),\n"
             f"                     {darker(profile['accent'])}, {colour_literal(profile['accent'])}}},")
-    out += ["};", "const size_t macro_profile_count = COUNT(macro_profiles);", ""]
+    out += [
+        "};",
+        "const size_t macro_builtin_profile_count = COUNT(macro_builtin_profiles);",
+        "const macro_profile_t *macro_profiles = macro_builtin_profiles;",
+        "size_t macro_profile_count = COUNT(macro_builtin_profiles);",
+        "",
+    ]
     return "\n".join(out), warnings
 
 

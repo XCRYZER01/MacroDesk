@@ -2,6 +2,7 @@
 firmware/MacroDeckUI/build/
 *.bin
 !firmware/prebuilt/*.bin
+!prebuilt/*.bin
 *.elf
 *.map
 

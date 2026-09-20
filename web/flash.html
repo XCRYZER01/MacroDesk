@@ -70,8 +70,9 @@
         <h2><span class="step-number">3</span> Flash</h2>
         <p>
           Flashing replaces the whole application. Your profiles live in the
-          firmware itself today, so anything you changed in the source is
-          overwritten by the image you pick above.
+          FAT runtime bundle after you use <strong>Send to device</strong> in
+          Studio. Erasing the whole flash removes that bundle; flashing without
+          erase normally keeps it.
         </p>
         <div class="flash-actions">
           <button class="button primary" id="flashButton" type="button">Connect and flash</button>
@@ -115,6 +116,6 @@
   </main>
 
   <div class="toast" id="toast" role="status"></div>
-  <script type="module" src="flash.js?v=1"></script>
+  <script type="module" src="flash.js?v=5"></script>
 </body>
 </html>

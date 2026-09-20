@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Turn the Arduino build output into the single ready-to-flash image in firmware/prebuilt/.
+"""Turn the Arduino build output into a browser-ready merged image in root/prebuilt/.
 
 Build first with `arduino-cli compile ... --export-binaries firmware/MacroDeckUI`, then:
 
@@ -14,7 +14,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 BUILD = ROOT / "firmware/MacroDeckUI/build/esp32.esp32.waveshare_esp32_s3_touch_lcd_7"
-OUT = ROOT / "firmware/prebuilt/MacroDesk-esp32s3-touch-lcd-7.bin"
+OUT = ROOT / "prebuilt/MacroDesk-esp32s3-touch-lcd-7.bin"
+LEGACY_OUT = ROOT / "firmware/prebuilt/MacroDesk-esp32s3-touch-lcd-7.bin"
 APP_OFFSET = 0x10000
 
 
@@ -37,6 +38,9 @@ def main() -> None:
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_bytes(image[:end])
     print(f"{OUT} ({end:,} bytes) - flash at 0x0")
+    LEGACY_OUT.parent.mkdir(parents=True, exist_ok=True)
+    LEGACY_OUT.write_bytes(image[:end])
+    print(f"{LEGACY_OUT} compatibility copy")
 
 
 if __name__ == "__main__":

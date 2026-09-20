@@ -5,7 +5,7 @@
 // hence "keep" for all three. Rewriting them here would contradict the build.
 import { ESPLoader, Transport } from "https://cdn.jsdelivr.net/npm/esptool-js@0.6.1/bundle.js";
 
-const PREBUILT = "../firmware/prebuilt/MacroDesk-esp32s3-touch-lcd-7.bin";
+const PREBUILT = "../prebuilt/MacroDesk-esp32s3-touch-lcd-7.bin?v=5";
 const FLASH_ADDRESS = 0x0;
 const FLASH_BAUD = 921600;
 

@@ -14,8 +14,8 @@
  */
 #include "macro_deck_ui.h"
 
-extern const uint16_t ui_reference_rgb565[];
-extern const uint16_t ui_orca_rgb565[];
+extern const uint16_t ui_fusion_clean_rgb565[];
+extern const uint16_t ui_orca_clean_rgb565[];
 
 /* ---- Rectangles shared by both profiles (x, y, w, h) ---- */
 #define SIDEBAR_ROW(i)   4, (lv_coord_t)(84 + (i) * 42), 123, 41
@@ -154,13 +154,13 @@ static const macro_button_t fusion_settings[] = {
 
 static const macro_page_t fusion_pages[] = {
     {NULL, NULL, NULL, 0, 0},
-    {"SKETCH", "Open a sketch first - light blue = S search (English UI)", ITEMS(fusion_sketch), 5},
-    {"SOLID", "Light blue = S search (English UI)", ITEMS(fusion_solid), 4},
-    {"SURFACE", "All via S search (English UI)", ITEMS(fusion_surface), 3},
-    {"MESH", "All via S search (English UI)", ITEMS(fusion_mesh), 4},
-    {"SHEET METAL", "All via S search (English UI)", ITEMS(fusion_sheet_metal), 3},
-    {"TOOLS", "Inspect and display helpers", ITEMS(fusion_tools), 3},
-    {"SETTINGS", "Fusion window layout and workspaces", ITEMS(fusion_settings), 4},
+    {"SKETCH", "", NULL, 0, 4},
+    {"SOLID", "", NULL, 0, 4},
+    {"SURFACE", "", NULL, 0, 4},
+    {"MESH", "", NULL, 0, 4},
+    {"SHEET METAL", "", NULL, 0, 4},
+    {"TOOLS", "", NULL, 0, 4},
+    {"SETTINGS", "", NULL, 0, 4},
 };
 
 /* ======================================================================== */
@@ -288,23 +288,25 @@ static const macro_button_t orca_settings[] = {
 
 static const macro_page_t orca_pages[] = {
     {NULL, NULL, NULL, 0, 0},
-    {"MODIFY", "Select a model in Orca first", ITEMS(orca_modify), 4},
-    {"VIEW", "Orange = Preview only (in Prepare L / C / arrows do other things)", ITEMS(orca_view), 4},
-    {"SUPPORT & PAINT", "Painting gizmos - select a model first", ITEMS(orca_support), 4},
-    {"FILAMENT", "Assigns a filament to the selected object or part", ITEMS(orca_filament), 5},
-    {"PRINTER", "Slice, export and print the active plate", ITEMS(orca_printer), 3},
-    {"TOOLS", "Gizmos and helpers", ITEMS(orca_tools), 3},
-    {"SETTINGS", "Orca settings and deck options", ITEMS(orca_settings), 3},
+    {"MODIFY", "", NULL, 0, 4},
+    {"VIEW", "", NULL, 0, 4},
+    {"SUPPORT", "", NULL, 0, 4},
+    {"FILAMENT", "", NULL, 0, 4},
+    {"PRINTER", "", NULL, 0, 4},
+    {"TOOLS", "", NULL, 0, 4},
+    {"SETTINGS", "", NULL, 0, 4},
 };
 
 /* ======================================================================== */
 
 #define COUNT(a) (sizeof(a) / sizeof((a)[0]))
 
-const macro_profile_t macro_profiles[] = {
-    [PROFILE_FUSION] = {"Fusion 360", ui_reference_rgb565, fusion_zones, COUNT(fusion_zones),
+const macro_profile_t macro_builtin_profiles[] = {
+    [PROFILE_FUSION] = {"Fusion 360", ui_fusion_clean_rgb565, fusion_zones, COUNT(fusion_zones),
                         fusion_pages, COUNT(fusion_pages), 0xCB5B18, 0xF47721},
-    [PROFILE_ORCA] = {"Orca Slicer", ui_orca_rgb565, orca_zones, COUNT(orca_zones),
+    [PROFILE_ORCA] = {"Orca Slicer", ui_orca_clean_rgb565, orca_zones, COUNT(orca_zones),
                       orca_pages, COUNT(orca_pages), 0x019C9E, 0x00E5D8},
 };
-const size_t macro_profile_count = COUNT(macro_profiles);
+const size_t macro_builtin_profile_count = COUNT(macro_builtin_profiles);
+const macro_profile_t *macro_profiles = macro_builtin_profiles;
+size_t macro_profile_count = COUNT(macro_builtin_profiles);

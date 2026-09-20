@@ -198,27 +198,104 @@ function Resize-CleanMaster {
     }
 }
 
+function New-PrusaPhotoMaster {
+    param(
+        [string]$BaseArtworkPath,
+        [string]$LogoPath,
+        [string]$HeaderPhotoPath,
+        [string]$OutputPath
+    )
+
+    # This artwork is assembled only from official Prusa raster assets plus
+    # deterministic fills/lines. No generated or retouched product imagery.
+    $bitmap = [System.Drawing.Bitmap]::new(1600, 960, [System.Drawing.Imaging.PixelFormat]::Format32bppArgb)
+    $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
+    $baseArtwork = [System.Drawing.Image]::FromFile($BaseArtworkPath)
+    $logo = [System.Drawing.Image]::FromFile($LogoPath)
+    $headerPhoto = [System.Drawing.Image]::FromFile($HeaderPhotoPath)
+
+    try {
+        $graphics.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
+        $graphics.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
+        $graphics.PixelOffsetMode = [System.Drawing.Drawing2D.PixelOffsetMode]::HighQuality
+
+        # Preserve the approved lower artwork exactly. Only the header is
+        # replaced below with official photographic assets.
+        $graphics.DrawImage($baseArtwork, 0, 0, 1600, 960)
+
+        $headerRect = [System.Drawing.RectangleF]::new(8, 8, 1584, 144)
+        $headerBrush = [System.Drawing.SolidBrush]::new([System.Drawing.Color]::FromArgb(255, 7, 18, 24))
+        $headerBorder = [System.Drawing.Pen]::new([System.Drawing.Color]::FromArgb(255, 29, 48, 57), 2)
+        try {
+            Fill-RoundedRectangle $graphics $headerBrush $headerRect 18
+            Draw-RoundedRectangle $graphics $headerBorder $headerRect 18
+        } finally {
+            $headerBrush.Dispose()
+            $headerBorder.Dispose()
+        }
+
+        $headerClip = New-RoundedPath $headerRect 18
+        $oldClip = $graphics.Clip
+        try {
+            $graphics.SetClip($headerClip)
+
+            # Use a shallow crop from the official high-resolution photograph.
+            # It keeps the Nextruder, rails and orange first layer visible in
+            # the banner without synthesising or stretching product details.
+            $headerTarget = [System.Drawing.RectangleF]::new(280, 8, 1312, 144)
+            $headerSource = [System.Drawing.RectangleF]::new(0, 1250, 4961, 544)
+            $graphics.DrawImage(
+                $headerPhoto,
+                $headerTarget,
+                $headerSource,
+                [System.Drawing.GraphicsUnit]::Pixel
+            )
+
+            $photoFade = [System.Drawing.Drawing2D.LinearGradientBrush]::new(
+                [System.Drawing.PointF]::new(240, 70),
+                [System.Drawing.PointF]::new(740, 70),
+                [System.Drawing.Color]::FromArgb(255, 7, 18, 24),
+                [System.Drawing.Color]::FromArgb(0, 7, 18, 24)
+            )
+            try { $graphics.FillRectangle($photoFade, 240, 8, 500, 144) } finally { $photoFade.Dispose() }
+
+            # Preserve the official logo artwork without redrawing it.
+            $graphics.DrawImage($logo, [System.Drawing.RectangleF]::new(42, 20, 176, 109))
+        } finally {
+            $graphics.Clip = $oldClip
+            $oldClip.Dispose()
+            $headerClip.Dispose()
+        }
+
+        $accentPen = [System.Drawing.Pen]::new([System.Drawing.Color]::FromArgb(255, 242, 107, 56), 4)
+        try { $graphics.DrawLine($accentPen, 10, 152, 1590, 152) } finally { $accentPen.Dispose() }
+
+        $outputDirectory = Split-Path -Parent $OutputPath
+        [System.IO.Directory]::CreateDirectory($outputDirectory) | Out-Null
+        $bitmap.Save($OutputPath, [System.Drawing.Imaging.ImageFormat]::Png)
+    } finally {
+        $headerPhoto.Dispose()
+        $logo.Dispose()
+        $baseArtwork.Dispose()
+        $graphics.Dispose()
+        $bitmap.Dispose()
+    }
+}
+
 $assetRoot = Join-Path $RepositoryRoot "firmware/MacroDeckUI/assets"
 $sourceRoot = Join-Path $assetRoot "source_photos"
 
-$backgrounds = @(
-    @{
-        Photo = Join-Path $sourceRoot "prusa_mk4_official.jpg"
-        Overlay = Join-Path $sourceRoot "prusa_mk4_product_official_512.png"
-        Output = Join-Path $assetRoot "ui_prusa_clean_800x480.png"
-        Accent = [System.Drawing.ColorTranslator]::FromHtml("#F26B38")
-    }
-)
-
-foreach ($background in $backgrounds) {
-    if (-not (Test-Path -LiteralPath $background.Photo)) {
-        throw "Missing source photo: $($background.Photo)"
-    }
-    New-CleanBackground -PhotoPath $background.Photo -OutputPath $background.Output -Accent $background.Accent -OverlayPath $background.Overlay
-    Write-Host "Created $($background.Output)"
-}
+New-PrusaPhotoMaster `
+    -BaseArtworkPath (Join-Path $sourceRoot "prusa_lower_artwork_master.png") `
+    -LogoPath (Join-Path $sourceRoot "prusa_research_official_logo.png") `
+    -HeaderPhotoPath (Join-Path $sourceRoot "prusa_mk4_header_official.jpg") `
+    -OutputPath (Join-Path $sourceRoot "prusa_header_only_master.png")
 
 $cleanMasters = @(
+    @{
+        Master = Join-Path $sourceRoot "prusa_header_only_master.png"
+        Output = Join-Path $assetRoot "ui_prusa_clean_800x480.png"
+    },
     @{
         Master = Join-Path $sourceRoot "orca_original_clean_master.png"
         Output = Join-Path $assetRoot "ui_orca_clean_800x480.png"

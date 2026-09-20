@@ -177,7 +177,7 @@
   const elements = {
     profileOne: $("#profileOne"), profileTwo: $("#profileTwo"), buttonList: $("#buttonList"),
     buttonListTitle: $("#buttonListTitle"), areaTabs: $("#areaTabs"), pageStrip: $("#pageStrip"), previewTitle: $("#previewTitle"),
-    screenProfileName: $("#screenProfileName"), appBadge: $("#appBadge"), deviceScreen: $("#deviceScreen"),
+    deviceScreen: $("#deviceScreen"),
     screenGrid: $("#screenGrid"), screenPanelGrid: $("#screenPanelGrid"), screenQuick: $("#screenQuick"),
     screenSidebar: $("#screenSidebar"), screenTabs: $("#screenTabs"), quickAction: $("#quickAction"),
     quickShortcut: $("#quickShortcut"), inspectorFields: $("#inspectorFields"),
@@ -192,7 +192,7 @@
     backgroundDimValue: $("#backgroundDimValue"), removeBackground: $("#removeBackground"),
     panelTitle: $("#panelTitle"), panelColumns: $("#panelColumns"), panelRows: $("#panelRows"),
     showQuickAction: $("#showQuickAction"),
-    saveState: $("#saveState"), toast: $("#toast")
+    saveState: $("#saveState"), toast: $("#toast"), sendToDevice: $("#sendToDevice")
   };
 
   function init() {
@@ -237,6 +237,7 @@
     elements.clearButton.addEventListener("click", () => updateButton({ label: "Empty", action: "none", value: "", icon: "−", iconImage: null, enabled: false }));
     $("#resetProfile").addEventListener("click", resetCurrentProfile);
     $("#exportButton").addEventListener("click", exportProject);
+    elements.sendToDevice.addEventListener("click", sendProjectToDevice);
     $("#importButton").addEventListener("click", () => elements.importFile.click());
     elements.importFile.addEventListener("change", importProject);
   }
@@ -278,6 +279,9 @@
     let last = -1;
     keys.forEach((button, index) => { if (button.enabled && button.action !== "none") last = index; });
     return last + 1;
+  }
+  function isUnmappedButton(button) {
+    return !button?.enabled || button?.action === "none" || !String(button?.value || "").trim();
   }
   const currentButton = () => buttonsFor(currentProfile())[selection.index] || null;
 
@@ -331,13 +335,10 @@
     elements.buttonListTitle.textContent = selection.area === "main"
       ? `${pageName(profile, profile.activePage)} · page ${profile.activePage + 1}`
       : `${profile.name} · ${AREA_NAMES[selection.area]}`;
-    elements.screenProfileName.textContent = profile.name;
-    elements.appBadge.textContent = profile.badge;
     elements.deviceScreen.style.setProperty("--profile-accent", profile.accent);
     elements.deviceScreen.style.setProperty("--main-columns", profile.id === "fusion" ? 5 : 6);
     elements.deviceScreen.style.setProperty("--panel-columns", profile.panelColumns);
     elements.deviceScreen.style.setProperty("--panel-rows", profile.panelRows);
-    elements.deviceScreen.classList.toggle("legacy-art-layout", profile.id === "orca" || profile.id === "fusion" || profile.id === "onshape" || profile.id === "blender");
     elements.deviceScreen.classList.toggle("full-right-panel", !profile.showQuickAction);
     elements.panelTitle.value = profile.panelTitle;
     const page = profile.pages[profile.activePage];
@@ -478,9 +479,12 @@
     buttons.forEach((button, index) => {
       const key = document.createElement("button");
       key.type = "button";
-      key.className = `${className}${selection.area === area && selection.index === index ? " selected" : ""}${button.enabled ? "" : " disabled"}`;
+      const empty = area === "panel" && isUnmappedButton(button);
+      key.className = `${className}${selection.area === area && selection.index === index ? " selected" : ""}${button.enabled ? "" : " disabled"}${empty ? " empty" : ""}`;
+      if (area === "panel") key.style.order = empty ? "1" : "0";
       key.style.setProperty("--button-accent", button.color);
-      key.innerHTML = `${iconMarkup(button, "key-icon")}<strong>${escapeHtml(button.label || "Untitled")}</strong><small>${escapeHtml(actionSummary(button))}</small>`;
+      if (!empty) key.innerHTML = `${iconMarkup(button, "key-icon")}<strong>${escapeHtml(button.label || "Untitled")}</strong><small>${escapeHtml(actionSummary(button))}</small>`;
+      key.setAttribute("aria-label", empty ? `Empty right sidebar slot ${index + 1}` : (button.label || `Key ${index + 1}`));
       key.addEventListener("click", () => selectButton(area, index));
       container.appendChild(key);
     });
@@ -560,6 +564,257 @@
       image.onerror = () => { URL.revokeObjectURL(src); reject(new Error("image")); };
       image.src = src;
     });
+  }
+
+  class BundleWriter {
+    constructor() { this.parts = []; this.length = 0; }
+    append(bytes) { this.parts.push(bytes); this.length += bytes.length; }
+    u8(value) { this.append(Uint8Array.of(value & 0xFF)); }
+    u16(value) { this.append(Uint8Array.of(value & 0xFF, (value >>> 8) & 0xFF)); }
+    i16(value) { this.u16(value & 0xFFFF); }
+    u32(value) { this.append(Uint8Array.of(value & 0xFF, (value >>> 8) & 0xFF, (value >>> 16) & 0xFF, (value >>> 24) & 0xFF)); }
+    string(value) {
+      const bytes = new TextEncoder().encode(String(value || ""));
+      if (bytes.length > 65535) throw new Error("Text is too long for the device");
+      this.u16(bytes.length); this.append(bytes); this.u8(0);
+    }
+    align4() { while (this.length % 4) this.u8(0); }
+    finish() {
+      const output = new Uint8Array(this.length); let offset = 0;
+      this.parts.forEach(part => { output.set(part, offset); offset += part.length; });
+      return output;
+    }
+  }
+
+  function crc32(bytes) {
+    let crc = 0xFFFFFFFF;
+    for (const value of bytes) {
+      crc ^= value;
+      for (let bit = 0; bit < 8; bit += 1) crc = (crc >>> 1) ^ ((crc & 1) ? 0xEDB88320 : 0);
+    }
+    return (crc ^ 0xFFFFFFFF) >>> 0;
+  }
+
+  function hexColour(value) { return Number.parseInt(String(value || "#000000").slice(1), 16) >>> 0; }
+  function darkerColour(value) {
+    const raw = hexColour(value);
+    return (((Math.floor(((raw >>> 16) & 0xFF) * .62)) << 16)
+      | ((Math.floor(((raw >>> 8) & 0xFF) * .62)) << 8)
+      | Math.floor((raw & 0xFF) * .62)) >>> 0;
+  }
+
+  function runtimeButton(button, override = null) {
+    let action = 0, arg = 0, keys = button.value || "";
+    if (override) ({ action, arg, keys = "" } = override);
+    else if (!button.enabled || button.action === "none" || !button.value) {
+      action = 1; keys = "";
+    } else if (button.action === "page") {
+      action = 3; arg = Math.max(0, Math.min(7, Number.parseInt(button.value, 10) - 1 || 0)); keys = "";
+    } else if (button.action === "search") keys = `search:${button.value}`;
+    else if (button.action === "text") action = 8;
+    const rawIcon = String(button.icon || "");
+    const fallbackIcon = (String(button.label || "?").trim()[0] || "?").toUpperCase();
+    const icon = /^[\x20-\x7E]{1,4}$/.test(rawIcon) ? rawIcon : (/^[\x20-\x7E]$/.test(fallbackIcon) ? fallbackIcon : "?");
+    return { action, arg, accent: hexColour(button.color), icon, label: button.label || "", keys };
+  }
+
+  function writeRuntimeButton(writer, button) {
+    writer.u8(button.action); writer.u8(button.arg); writer.u32(button.accent);
+    writer.string(button.icon); writer.string(button.label); writer.string(button.keys);
+  }
+
+  function runtimeZones(profile, profileIndex, profiles) {
+    const zones = [];
+    const add = (x, y, w, h, button) => zones.push({ x, y, w, h, button: runtimeButton(button) });
+    profile.sidebarButtons.slice(0, 8).forEach((button, row) => add(4, 84 + row * 42, 123, 41, button));
+
+    const main = profile.pageButtons[0], columns = main.length === 20 ? 5 : 6;
+    const [left, pitch, width] = columns === 5 ? [133, 97, 93] : [134, 80, 76];
+    main.forEach((button, slot) => add(left + (slot % columns) * pitch, 88 + Math.floor(slot / columns) * 85, width, 82, button));
+
+    if (profile.showQuickAction) add(620, 88, 168, 63, profile.quickAction);
+    const panelColumns = profile.panelColumns, panelRows = profile.panelRows;
+    const panelCount = panelColumns * panelRows;
+    const panelLeft = 626, panelWidth = 160, gapX = 2;
+    const cellWidth = Math.floor((panelWidth - gapX * (panelColumns - 1)) / panelColumns);
+    const panelTop = profile.showQuickAction ? 186 : 128;
+    const panelHeight = profile.showQuickAction ? 204 : 264, gapY = 6;
+    const cellHeight = Math.floor((panelHeight - gapY * (panelRows - 1)) / panelRows);
+    const panelButtons = profile.panelButtons.slice(0, panelCount);
+    const orderedPanelButtons = panelButtons.filter(button => !isUnmappedButton(button))
+      .concat(panelButtons.filter(isUnmappedButton));
+    orderedPanelButtons.forEach((button, slot) => {
+      const column = slot % panelColumns, row = Math.floor(slot / panelColumns);
+      // Keep every right-sidebar zone in the bundle so its slot still exists.
+      // Mapped keys pack from the top-left. Unmapped zones move to the end and
+      // have an empty visual label, so firmware retains their geometry without
+      // drawing a card over the artwork.
+      const runtimePanelButton = isUnmappedButton(button) ? { ...button, label: "", icon: "" } : button;
+      add(panelLeft + column * (cellWidth + gapX), panelTop + row * (cellHeight + gapY), cellWidth, cellHeight, runtimePanelButton);
+    });
+
+    const tab = (index, x, width) => ({
+      x, y: 432, w: width, h: 40,
+      button: runtimeButton({ label: profiles[index].name, icon: profiles[index].badge, color: profiles[index].accent }, { action: 2, arg: index })
+    });
+    zones.push(tab(0, 78, 128), tab(1, 208, 128), {
+      x: 337, y: 432, w: 118, h: 40,
+      button: runtimeButton({ label: "System", icon: "S", color: profile.accent }, { action: 1, arg: 0 })
+    });
+    return zones;
+  }
+
+  function usedPageButtons(buttons) {
+    let last = -1;
+    buttons.forEach((button, index) => { if (button.enabled && button.action !== "none") last = index; });
+    return buttons.slice(0, last + 1);
+  }
+
+  async function renderRuntimeImage(profile) {
+    if (location.protocol === "file:" && profile.backgroundImage && !profile.backgroundImage.startsWith("data:")) {
+      throw new Error("Open Studio from http://localhost before sending built-in backgrounds");
+    }
+    const canvas = document.createElement("canvas"); canvas.width = 800; canvas.height = 480;
+    const context = canvas.getContext("2d", { willReadFrequently: true });
+    context.fillStyle = "#071116"; context.fillRect(0, 0, 800, 480);
+    if (profile.backgroundImage) {
+      const image = await new Promise((resolve, reject) => {
+        const next = new Image();
+        if (!profile.backgroundImage.startsWith("data:")) next.crossOrigin = "anonymous";
+        next.onload = () => resolve(next);
+        next.onerror = () => reject(new Error(`Could not load ${profile.name} background; serve the repository from localhost`));
+        next.src = profile.backgroundImage;
+      });
+      context.drawImage(image, 0, 0, 800, 480);
+      const dim = Math.max(0, Math.min(1, Number(profile.backgroundDim) || 0));
+      if (dim) { context.fillStyle = `rgba(7,17,22,${dim})`; context.fillRect(0, 0, 800, 480); }
+    }
+    const rgba = context.getImageData(0, 0, 800, 480).data;
+    const rgb565 = new Uint8Array(800 * 480 * 2);
+    for (let pixel = 0, source = 0, target = 0; pixel < 800 * 480; pixel += 1, source += 4, target += 2) {
+      const value = ((rgba[source] & 0xF8) << 8) | ((rgba[source + 1] & 0xFC) << 3) | (rgba[source + 2] >>> 3);
+      rgb565[target] = value & 0xFF; rgb565[target + 1] = value >>> 8;
+    }
+    return rgb565;
+  }
+
+  async function buildRuntimeBundle(value) {
+    validateProject(value);
+    const writer = new BundleWriter();
+    for (let profileIndex = 0; profileIndex < value.profiles.length; profileIndex += 1) {
+      const profile = value.profiles[profileIndex];
+      writer.string(profile.name); writer.u32(darkerColour(profile.accent)); writer.u32(hexColour(profile.accent));
+      writer.align4();
+      const image = await renderRuntimeImage(profile);
+      writer.u32(image.length); writer.append(image);
+
+      const zones = runtimeZones(profile, profileIndex, value.profiles);
+      writer.u16(zones.length);
+      zones.forEach(zone => {
+        writer.i16(zone.x); writer.i16(zone.y); writer.i16(zone.w); writer.i16(zone.h); writeRuntimeButton(writer, zone.button);
+      });
+
+      writer.u8(profile.pages.length);
+      profile.pages.forEach((page, pageIndex) => {
+        const buttons = pageIndex === 0 ? [] : usedPageButtons(profile.pageButtons[pageIndex]).map(button => runtimeButton(button));
+        writer.string(page.title); writer.string(page.hint); writer.u8(pageIndex === 0 ? 0 : page.columns); writer.u8(buttons.length);
+        buttons.forEach(button => writeRuntimeButton(writer, button));
+      });
+    }
+    const payload = writer.finish();
+    const bundle = new Uint8Array(16 + payload.length); bundle.set([0x4D, 0x44, 0x42, 0x31], 0);
+    const header = new DataView(bundle.buffer); header.setUint16(4, 1, true); bundle[6] = value.profiles.length;
+    header.setUint32(8, bundle.length, true); header.setUint32(12, crc32(payload), true); bundle.set(payload, 16);
+    return bundle;
+  }
+
+  async function waitForProtocol(reader, state, accepted, timeoutMs) {
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      const remaining = deadline - Date.now();
+      const result = await Promise.race([
+        reader.read(),
+        new Promise((_, reject) => setTimeout(() => reject(new Error("Device response timed out")), remaining))
+      ]);
+      if (result.done) throw new Error("Device disconnected");
+      state.text += state.decoder.decode(result.value, { stream: true });
+      const lines = state.text.split(/\r?\n/); state.text = lines.pop();
+      for (const line of lines) {
+        if (line.startsWith("MDERR ")) throw new Error(`Device rejected profile: ${line.slice(6)}`);
+        if (accepted.some(prefix => line.startsWith(prefix))) return line;
+      }
+    }
+    throw new Error("Device response timed out");
+  }
+
+  async function sendProjectToDevice() {
+    if (!("serial" in navigator)) return showToast("Use Chrome or Edge: this browser has no Web Serial");
+    if (location.protocol === "file:") return showToast("Serve the repository, then open Studio at http://localhost");
+    const button = elements.sendToDevice, original = button.textContent;
+    let port, reader, writer;
+    button.disabled = true;
+    try {
+      port = await navigator.serial.requestPort({ filters: [{ usbVendorId: 0x1A86, usbProductId: 0x55D3 }] });
+      button.textContent = "Preparing…"; showToast("Preparing images for the device…");
+      const snapshot = clone(project);
+      const bitmapIconCount = snapshot.profiles.reduce((total, profile) => total +
+        [...profile.sidebarButtons, ...profile.pageButtons.flat(), ...profile.panelButtons, profile.quickAction]
+          .filter(item => item.iconImage).length, 0);
+      const bundle = await buildRuntimeBundle(snapshot);
+      await port.open({ baudRate: 115200, bufferSize: 65536 });
+      reader = port.readable.getReader(); writer = port.writable.getWriter();
+      const state = { decoder: new TextDecoder(), text: "" };
+      button.textContent = "Waking device…";
+      // Opening CH343 toggles the ESP32-S3 reset lines on some Windows drivers.
+      // Let the full display/UI boot finish before sending the upload command;
+      // bytes written during that reset window can disappear without an error.
+      await new Promise(resolve => setTimeout(resolve, 6000));
+      const bundleCrc = crc32(bundle).toString(16).padStart(8, "0");
+      button.textContent = "Starting transfer…";
+      await writer.write(new TextEncoder().encode(`MDUP ${bundle.length} ${bundleCrc}\n`));
+      try {
+        await waitForProtocol(reader, state, ["MDREADY "], 30000);
+      } catch (error) {
+        if (error.message === "Device response timed out") throw new Error("Device did not answer MDREADY after restart");
+        throw error;
+      }
+      const chunkSize = 512;
+      const progressWindow = 4 * 1024;
+      for (let windowStart = 0; windowStart < bundle.length; windowStart += progressWindow) {
+        const windowEnd = Math.min(bundle.length, windowStart + progressWindow);
+        for (let offset = windowStart; offset < windowEnd; offset += chunkSize) {
+          await writer.write(bundle.subarray(offset, Math.min(windowEnd, offset + chunkSize)));
+        }
+        if (windowEnd < bundle.length) {
+          try {
+            await waitForProtocol(reader, state, ["MDPROGRESS "], 15000);
+          } catch (error) {
+            if (error.message === "Device response timed out") {
+              throw new Error(`Device stopped receiving at ${Math.round(windowStart * 100 / bundle.length)}%`);
+            }
+            throw error;
+          }
+          button.textContent = `Sending ${Math.round(windowEnd * 100 / bundle.length)}%`;
+        }
+      }
+      button.textContent = "Verifying…";
+      try {
+        await waitForProtocol(reader, state, ["MDOK "], 30000);
+      } catch (error) {
+        if (error.message === "Device response timed out") throw new Error("Device did not finish verifying the profile");
+        throw error;
+      }
+      showToast(bitmapIconCount
+        ? `Profile installed; ${bitmapIconCount} bitmap icon(s) use text fallback on the board`
+        : "Profile installed — the board is restarting");
+    } catch (error) {
+      showToast(error.message || "Could not send profile to the device");
+    } finally {
+      if (reader) { try { await reader.cancel(); } catch (_) {} reader.releaseLock(); }
+      if (writer) { try { await writer.close(); } catch (_) {} writer.releaseLock(); }
+      if (port) { try { await port.close(); } catch (_) {} }
+      button.disabled = false; button.textContent = original;
+    }
   }
 
   function exportProject() {

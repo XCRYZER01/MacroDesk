@@ -226,17 +226,6 @@ input:focus, select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px v
   background-size: 20px 20px;
 }
 
-.screen-header {
-  position: absolute; left: .7%; top: 1.5%; right: .7%; height: 14%;
-  display: flex; align-items: center; gap: 2%; padding: 0 2%;
-  border: 1px solid #1d3039; border-radius: 10px;
-  background: linear-gradient(90deg, rgba(12, 25, 31, .97) 0 43%, rgba(12, 25, 31, .62) 75%, rgba(12, 25, 31, .76));
-}
-.app-badge { width: 8%; aspect-ratio: 1; border-radius: 11px; display: grid; place-items: center; background: var(--profile-accent); color: #041110; font-size: clamp(12px, 2.72cqw, 26px); font-weight: 900; }
-.screen-header strong { display: block; font-size: clamp(11px, 2.62cqw, 25px); }
-.screen-header small { display: block; margin-top: 3px; color: var(--profile-accent); font-size: clamp(5px, .84cqw, 8px); letter-spacing: .18em; }
-.device-screen.legacy-art-layout .screen-header { display: none; }
-
 .screen-sidebar { position: absolute; left: .5%; top: 17.5%; bottom: 12.9%; width: 15.4%; display: grid; gap: .6%; grid-template-rows: repeat(8, 1fr); }
 .screen-sidebar button { min-width: 0; color: #dce6e8; background: rgba(12, 25, 31, .93); border: 1px solid #1c3039; border-radius: 7px; display: flex; align-items: center; gap: 8%; padding: 0 9%; font-size: clamp(6px, 1.26cqw, 12px); font-weight: 750; }
 .screen-sidebar button.active { color: #fff; border-color: var(--button-accent); background: color-mix(in srgb, var(--button-accent) 24%, #0c191f); }
@@ -313,6 +302,8 @@ input:focus, select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px v
 .screen-panel-key { min-width: 0; border: 1px solid #20343d; border-radius: 7px; background: rgba(14, 27, 33, .96); color: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2%; padding: 2%; }
 .screen-panel-key.selected { border-color: var(--button-accent); box-shadow: inset 0 0 0 1px var(--button-accent); }
 .screen-panel-key.disabled { opacity: .38; }
+.screen-panel-key.empty,
+.screen-panel-key.empty.selected { border-color: transparent; background: transparent; box-shadow: none; opacity: 1; }
 .screen-panel-key .key-icon { width: 27%; max-height: 27%; }
 .screen-panel-key strong { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: clamp(5px, .84cqw, 8px); }
 .screen-panel-key small { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #718994; font-size: clamp(3px, .63cqw, 6px); }

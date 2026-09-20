@@ -7,6 +7,7 @@
 #include "USBHIDKeyboard.h"
 
 #include "esp_lv_adapter_arduino.h"
+#include "macro_deck_runtime.h"
 #include "macro_deck_ui.h"
 
 using namespace esp_panel::drivers;
@@ -112,7 +113,7 @@ static void on_button(const macro_button_t *button, void *user_data)
 {
     (void)user_data;
     static const char *const kActionNames[] = {
-        "keys", "none", "profile", "page", "jog open", "jog move", "jog step", "jog close",
+        "keys", "none", "profile", "page", "jog open", "jog move", "jog step", "jog close", "text",
     };
     const bool has_label = button->label != nullptr && button->label[0] != '\0';
     const char *name = has_label ? button->label
@@ -129,12 +130,19 @@ static void on_button(const macro_button_t *button, void *user_data)
                       mon.used_pct, static_cast<unsigned>(mon.free_size), mon.frag_pct);
     }
 
-    if (button->keys != nullptr) send_keys(button->keys);
+    if (button->keys != nullptr) {
+        if (button->action == MACRO_ACTION_TEXT) Keyboard.print(button->keys);
+        else send_keys(button->keys);
+    }
 }
 void setup()
 {
+    // Runtime profile uploads arrive as sustained binary data at 115200 baud.
+    // The default UART ring is too small while FFat writes and drops bytes.
+    Serial.setRxBufferSize(64 * 1024);
     Serial.begin(115200);
     Serial.println("Macro Deck UI start");
+    macro_deck_runtime_begin();
 
     Board *board = new Board();
     if ((board == nullptr) || !board->init()) {
@@ -210,5 +218,6 @@ void setup()
 
 void loop()
 {
-    delay(1000);
+    macro_deck_runtime_poll();
+    delay(2);
 }
