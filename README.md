@@ -8,6 +8,9 @@ Users do not need VS Code, Arduino IDE, or firmware knowledge. Flash the bundled
 firmware once, then choose templates, arrange buttons, edit shortcuts, and send
 the result to the device from MacroDesk Studio in Chrome or Edge.
 
+**[Open MacroDesk Studio](https://xcryzer01.github.io/MacroDesk/)** ·
+**[Flash firmware](https://xcryzer01.github.io/MacroDesk/web/flash.html)**
+
 ## Current status
 
 - Browser firmware flashing is working on real hardware.
@@ -59,28 +62,27 @@ waits for the connection to settle before accepting a project.
 
 ## Quick start
 
-### 1. Start the local website
+### 1. Open MacroDesk Studio
 
-Web Serial and background conversion do not work correctly from a `file://`
-page. Serve the repository root over localhost:
+Use desktop Chrome or Edge to open the deployed HTTPS site:
+
+**[https://xcryzer01.github.io/MacroDesk/](https://xcryzer01.github.io/MacroDesk/)**
+
+No download or local server is required. If you are developing the project
+locally, serve the repository root instead of opening the files with `file://`:
 
 ```powershell
 cd "D:\Macro Dash"
 py -m http.server 8000
 ```
 
-Then use Chrome or Edge to open:
-
-- Firmware flasher: `http://localhost:8000/web/flash.html`
-- MacroDesk Studio: `http://localhost:8000/web/`
-
-If port 8000 is already in use, choose another port and use the same port in
-both URLs.
+The local Studio is then available at `http://localhost:8000/web/`.
 
 ### 2. Flash the firmware once
 
 1. Connect a data cable to the board port marked **USB TO UART**.
-2. Open `http://localhost:8000/web/flash.html`.
+2. Open the deployed [firmware flasher](https://xcryzer01.github.io/MacroDesk/web/flash.html),
+   or `http://localhost:8000/web/flash.html` when developing locally.
 3. Keep **Bundled build** selected and click **Connect and flash**.
 4. Select `USB-Enhanced-SERIAL CH343` in the browser port chooser.
 5. Wait for verification and the board restart.
@@ -94,7 +96,7 @@ custom project already stored in the FAT partition.
 
 ### 3. Customize and send a project
 
-1. Open `http://localhost:8000/web/`.
+1. Open [MacroDesk Studio](https://xcryzer01.github.io/MacroDesk/).
 2. Choose two application templates.
 3. Edit the main grid, left sidebar, right sidebar, quick action, colors,
    shortcuts, icons, and backgrounds.
