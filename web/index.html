@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#071116">
   <title>MacroDesk Studio</title>
-  <link rel="stylesheet" href="styles.css?v=8">
+  <link rel="stylesheet" href="styles.css?v=9">
 </head>
 <body>
   <header class="topbar">
@@ -28,7 +28,6 @@
       <div class="panel-heading">
         <span class="eyebrow">Profile pair</span>
         <h1>Choose your tools</h1>
-        <p>Pick two apps, then shape every key to your workflow.</p>
       </div>
 
       <div class="profile-picker">
@@ -38,6 +37,8 @@
         <select id="profileTwo"></select>
       </div>
 
+      <details class="settings-group">
+        <summary>Background image</summary>
       <div class="background-editor">
         <div class="section-title compact">
           <div>
@@ -55,9 +56,10 @@
         <label class="range-label" for="backgroundDim"><span>Image dim</span><output id="backgroundDimValue">28%</output></label>
         <input id="backgroundDim" class="range-input" type="range" min="0" max="80" step="1" value="28">
       </div>
+      </details>
 
-      <div class="divider"></div>
-
+      <details class="settings-group">
+        <summary>Right sidebar layout</summary>
       <section class="sidebar-layout-editor" aria-labelledby="sidebarLayoutTitle">
         <div class="section-title compact">
           <div>
@@ -89,6 +91,7 @@
           <input id="showQuickAction" type="checkbox" checked>
         </label>
       </section>
+      </details>
 
       </div>
 
@@ -101,18 +104,6 @@
         <button class="icon-button" id="resetProfile" type="button" title="Reset this profile" aria-label="Reset this profile">↺</button>
       </div>
       <div class="page-strip" id="pageStrip" aria-label="Deck page"></div>
-      <div class="page-meta" id="pageMeta" hidden>
-        <label for="pageTitle">Page title</label>
-        <input id="pageTitle" maxlength="18" placeholder="MODIFY">
-        <label for="pageHint">Hint</label>
-        <input id="pageHint" maxlength="64" placeholder="One line under the title">
-        <label for="pageColumns">Columns</label>
-        <select id="pageColumns">
-          <option value="3">3 columns</option>
-          <option value="4">4 columns</option>
-          <option value="5">5 columns</option>
-        </select>
-      </div>
       <div class="area-tabs" id="areaTabs" aria-label="Button area">
         <button class="active" type="button" data-area="main">Page 1 · 24</button>
         <button type="button" data-area="sidebar">Left sidebar 8</button>
@@ -163,6 +154,19 @@
     </section>
 
     <aside class="panel inspector-panel">
+      <div class="page-meta" id="pageMeta" hidden>
+        <span class="eyebrow">Sidebar page</span>
+        <label for="pageTitle">Title on the device</label>
+        <input id="pageTitle" maxlength="18" placeholder="MODIFY">
+        <label for="pageHint">Hint</label>
+        <input id="pageHint" maxlength="64" placeholder="One line under the title">
+        <label for="pageColumns">Columns</label>
+        <select id="pageColumns">
+          <option value="3">3 columns</option>
+          <option value="4">4 columns</option>
+          <option value="5">5 columns</option>
+        </select>
+      </div>
       <div class="panel-heading inspector-heading">
         <span class="eyebrow">Inspector</span>
         <h2>Customize key</h2>
@@ -213,6 +217,6 @@
   </main>
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
-  <script src="app.js?v=8"></script>
+  <script src="app.js?v=9"></script>
 </body>
 </html>

@@ -16,6 +16,10 @@
 
 * { box-sizing: border-box; }
 
+/* An author display rule beats the UA stylesheet, so [hidden] needs saying twice.
+   Without this .page-meta and .screen-grid stay on screen when the code hides them. */
+[hidden] { display: none !important; }
+
 html, body { min-height: 100%; }
 
 body {
@@ -99,8 +103,8 @@ button, select { cursor: pointer; }
 .library-panel { border-right: 1px solid var(--line-soft); display: flex; flex-direction: column; min-height: 0; overflow: hidden; padding: 24px 20px; }
 
 /* Settings and the key list scroll separately, so the list is never pushed below the fold. */
-.library-settings { flex: 1 1 auto; min-height: 120px; overflow-y: auto; padding-right: 4px; }
-.library-buttons { flex: 0 0 auto; max-height: min(58%, 560px); display: flex; flex-direction: column; min-height: 0; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line-soft); }
+.library-settings { flex: 0 0 auto; overflow: visible; padding-right: 4px; }
+.library-buttons { flex: 1 1 auto; max-height: none; display: flex; flex-direction: column; min-height: 0; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line-soft); }
 .library-buttons .button-list { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding-right: 4px; }
 .inspector-panel { border-left: 1px solid var(--line-soft); display: flex; flex-direction: column; overflow-y: auto; }
 
@@ -145,7 +149,15 @@ input:focus, select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px v
 .range-label output { color: var(--muted); font: 9px ui-monospace, SFMono-Regular, Consolas, monospace; }
 .range-input { height: 16px; margin-top: 4px; padding: 0; border: 0; accent-color: var(--accent); box-shadow: none !important; }
 .drag-hint { margin: 4px 0 12px; color: var(--muted); font-size: 10px; }
-.page-meta { display: grid; gap: 6px; margin-top: 12px; padding: 12px; border: 1px solid var(--line-soft); border-radius: 10px; background: rgba(13, 27, 33, .55); }
+.settings-group { margin-top: 14px; border: 1px solid var(--line-soft); border-radius: 10px; background: rgba(13, 27, 33, .45); }
+.settings-group > summary { padding: 10px 12px; color: #b8c8ce; font-size: 11px; font-weight: 750; cursor: pointer; list-style: none; }
+.settings-group > summary::-webkit-details-marker { display: none; }
+.settings-group > summary::before { content: "\25B8"; display: inline-block; width: 12px; color: var(--accent); transition: transform .15s ease; }
+.settings-group[open] > summary::before { transform: rotate(90deg); }
+.settings-group > summary:hover { color: var(--text); }
+.settings-group > *:not(summary) { padding: 0 12px 12px; }
+
+.page-meta { display: grid; gap: 6px; padding: 16px 22px; border-bottom: 1px solid var(--line-soft); background: rgba(13, 27, 33, .55); }
 .page-meta label { font-size: 10px; }
 .page-meta input, .page-meta select { padding: 8px 10px; font-size: 11px; }
 
@@ -351,7 +363,12 @@ fieldset label:not(:first-child) { margin-top: 9px; }
   .library-panel { display: block; overflow: visible; border-right: 0; border-bottom: 1px solid var(--line-soft); }
   .library-settings, .library-buttons { max-height: none; overflow: visible; }
   .library-buttons .button-list { overflow: visible; }
-  .button-list { grid-template-columns: repeat(2, 1fr); }
+  .button-list { grid-template-columns: 1fr; }
+  .topbar { height: auto; flex-wrap: wrap; gap: 10px; padding: 12px 16px; }
+  .top-actions { flex-wrap: wrap; }
+  .top-actions .button { padding: 8px 11px; font-size: 12px; }
+  .save-state { width: 100%; margin: 0; }
+  .button-list-item { grid-template-columns: 18px 28px minmax(0, 1fr) auto; gap: 6px; }
   .stage { padding: 28px 12px 40px; }
   .inspector-panel { position: static; width: auto; transform: none; border-left: 0; border-top: 1px solid var(--line-soft); box-shadow: none; }
 }
