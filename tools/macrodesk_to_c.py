@@ -103,7 +103,8 @@ def button_body(button, warnings, where, with_accent):
 
 
 def zone(rect, button, warnings, where):
-    return f"    {{{rect}, {{{icon_literal(button)}, {button_body(button, warnings, where, False)}}}}},"
+    # Zones are painted by the firmware now, so their accent colours the icon.
+    return f"    {{{rect}, {{{icon_literal(button)}, {button_body(button, warnings, where, True)}}}}},"
 
 
 def image_symbol(profile, warnings):

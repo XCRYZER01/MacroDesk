@@ -118,7 +118,7 @@ static void button_event_cb(lv_event_t *event)
     if (s_button_cb != NULL) s_button_cb(button, s_user_data);
 }
 
-/* Invisible touch area over a button painted in the background image. */
+/* Touch area for a button; its face is painted onto the canvas by paint_zone(). */
 static void make_zone(lv_obj_t *parent, const macro_zone_t *zone)
 {
     lv_obj_t *hit = lv_btn_create(parent);
@@ -309,6 +309,67 @@ static void build_jog_pad(lv_obj_t *parent)
     lv_obj_add_flag(s_jog_pad, LV_OBJ_FLAG_HIDDEN);
 }
 
+/* ---- Painting the image page ------------------------------------------ */
+
+/* The deck used to rely on its labels being painted into the background PNG,
+ * which made a button impossible to change without redrawing the artwork. The
+ * artwork now carries only the frame and the card shapes, and the text is
+ * painted here from the profile itself.
+ *
+ * It is drawn into the canvas rather than built from LVGL objects on purpose:
+ * a profile has around forty zones, and a card plus an icon and two labels each
+ * would need several times the 48 KB LVGL heap. Painting into the image buffer
+ * costs no LVGL memory at all and happens once per profile switch. */
+static void paint_text(lv_coord_t x, lv_coord_t y, lv_coord_t w,
+                       const lv_font_t *font, uint32_t colour, const char *text)
+{
+    if (text == NULL || text[0] == '\0') return;
+    lv_draw_label_dsc_t dsc;
+    lv_draw_label_dsc_init(&dsc);
+    dsc.color = C_HEX(colour);
+    dsc.font = font;
+    dsc.align = LV_TEXT_ALIGN_CENTER;
+    lv_canvas_draw_text(s_canvas, x, y, w, &dsc, text);
+}
+
+static void paint_zone(const macro_zone_t *zone)
+{
+    const macro_button_t *button = &zone->button;
+    if (button->label == NULL || button->label[0] == '\0') return;
+
+    const bool dead = button->action == MACRO_ACTION_NONE;
+    const uint32_t colour = dead ? COLOR_MUTED : COLOR_TEXT;
+    const lv_font_t *label_font = zone->w >= 110 ? &lv_font_montserrat_14 : &lv_font_montserrat_12;
+    const lv_coord_t lh = (lv_coord_t)lv_font_get_line_height(label_font);
+    const lv_coord_t sh = (lv_coord_t)lv_font_get_line_height(&lv_font_montserrat_12);
+
+    /* Sidebar rows and the bottom bar are one short line of text. */
+    if (zone->h < 50) {
+        paint_text(zone->x, zone->y + (zone->h - lh) / 2, zone->w, label_font, colour, button->label);
+        return;
+    }
+
+    /* Keys: an icon on top where there is room, then the label, then the key it
+     * sends. The label is given two lines so a long one wraps instead of
+     * running over the shortcut. */
+    const lv_coord_t bottom = zone->y + zone->h;
+    if (zone->h >= 76 && button->icon != NULL && button->icon[0] != '\0') {
+        paint_text(zone->x, zone->y + 8, zone->w, &lv_font_montserrat_16,
+                   button->accent != 0 ? button->accent : COLOR_ICON, button->icon);
+        paint_text(zone->x, bottom - sh - 2 * lh - 6, zone->w, label_font, colour, button->label);
+    } else {
+        paint_text(zone->x, zone->y + 4, zone->w, label_font, colour, button->label);
+    }
+    paint_text(zone->x, bottom - sh - 4, zone->w, &lv_font_montserrat_12, COLOR_MUTED,
+               dead ? "" : shortcut_text(button));
+}
+
+static void paint_profile(const macro_profile_t *profile)
+{
+    if (s_canvas == NULL) return;
+    for (size_t i = 0; i < profile->zone_count; ++i) paint_zone(&profile->zones[i]);
+}
+
 /* ---- Profiles --------------------------------------------------------- */
 
 static void set_active_profile(size_t index)
@@ -321,6 +382,7 @@ static void set_active_profile(size_t index)
     s_profile = index;
     if (s_canvas_pixels != NULL) {
         memcpy(s_canvas_pixels, macro_profiles[index].image, SCREEN_W * SCREEN_H * sizeof(lv_color_t));
+        paint_profile(&macro_profiles[index]);
         lv_obj_invalidate(s_canvas);
     }
     for (size_t i = 0; i < macro_profile_count && i < MAX_PROFILES; ++i) {
