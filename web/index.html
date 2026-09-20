@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#071116">
+  <title>MacroDesk Studio</title>
+  <link rel="stylesheet" href="styles.css?v=7">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="#" aria-label="MacroDesk Studio home">
+      <span class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></span>
+      <span><strong>MacroDesk</strong><small>Studio</small></span>
+    </a>
+    <div class="top-actions">
+      <span class="save-state" id="saveState">Saved locally</span>
+      <button class="button ghost" id="importButton" type="button">Import</button>
+      <button class="button primary" id="exportButton" type="button">Export .macrodesk</button>
+      <input id="importFile" type="file" accept=".macrodesk,.json,application/json" hidden>
+    </div>
+  </header>
+
+  <main class="workspace">
+    <aside class="panel library-panel">
+      <div class="library-settings">
+      <div class="panel-heading">
+        <span class="eyebrow">Profile pair</span>
+        <h1>Choose your tools</h1>
+        <p>Pick two apps, then shape every key to your workflow.</p>
+      </div>
+
+      <div class="profile-picker">
+        <label for="profileOne">Profile 1</label>
+        <select id="profileOne"></select>
+        <label for="profileTwo">Profile 2</label>
+        <select id="profileTwo"></select>
+      </div>
+
+      <div class="background-editor">
+        <div class="section-title compact">
+          <div>
+            <span class="eyebrow">Canvas</span>
+            <h2>Background</h2>
+          </div>
+          <button class="icon-button" id="removeBackground" type="button" title="Remove background" aria-label="Remove background" disabled>×</button>
+        </div>
+        <button class="background-upload" id="uploadBackgroundButton" type="button">
+          <span aria-hidden="true">▧</span>
+          <strong>Upload background</strong>
+          <small>PNG, JPG or SVG · cropped to 800 × 480</small>
+        </button>
+        <input id="backgroundFile" type="file" accept="image/png,image/jpeg,image/svg+xml" hidden>
+        <label class="range-label" for="backgroundDim"><span>Image dim</span><output id="backgroundDimValue">28%</output></label>
+        <input id="backgroundDim" class="range-input" type="range" min="0" max="80" step="1" value="28">
+      </div>
+
+      <div class="divider"></div>
+
+      <section class="sidebar-layout-editor" aria-labelledby="sidebarLayoutTitle">
+        <div class="section-title compact">
+          <div>
+            <span class="eyebrow">Layout</span>
+            <h2 id="sidebarLayoutTitle">Right sidebar</h2>
+          </div>
+        </div>
+
+        <label for="panelTitle">Panel title</label>
+        <input id="panelTitle" maxlength="14" placeholder="VIEW">
+
+        <div class="layout-field-row">
+          <label for="panelColumns">Columns
+            <select id="panelColumns">
+              <option value="2">2 columns</option>
+              <option value="3">3 columns</option>
+            </select>
+          </label>
+          <label for="panelRows">Rows
+            <select id="panelRows">
+              <option value="2">2 rows</option>
+              <option value="3">3 rows</option>
+            </select>
+          </label>
+        </div>
+
+        <label class="toggle-row sidebar-toggle">
+          <span><strong>Quick action</strong><small>Show the large button above the grid.</small></span>
+          <input id="showQuickAction" type="checkbox" checked>
+        </label>
+      </section>
+
+      </div>
+
+      <div class="library-buttons">
+      <div class="section-title">
+        <div>
+          <span class="eyebrow">Buttons</span>
+          <h2 id="buttonListTitle">Main page</h2>
+        </div>
+        <button class="icon-button" id="resetProfile" type="button" title="Reset this profile" aria-label="Reset this profile">↺</button>
+      </div>
+      <div class="page-strip" id="pageStrip" aria-label="Deck page"></div>
+      <div class="area-tabs" id="areaTabs" aria-label="Button area">
+        <button class="active" type="button" data-area="main">Page 1 · 24</button>
+        <button type="button" data-area="sidebar">Left sidebar 8</button>
+        <button type="button" data-area="panel">Right sidebar 9</button>
+        <button type="button" data-area="quick">Quick action</button>
+      </div>
+      <p class="drag-hint">Drag a button to swap its position.</p>
+      <div class="button-list" id="buttonList"></div>
+      </div>
+    </aside>
+
+    <section class="stage" aria-label="MacroDesk preview">
+      <div class="stage-heading">
+        <div>
+          <span class="eyebrow">Live preview</span>
+          <h2 id="previewTitle">Profile</h2>
+        </div>
+        <div class="device-state"><span></span> 800 × 480</div>
+      </div>
+
+      <div class="device-shell">
+        <div class="device-screen" id="deviceScreen">
+          <div class="screen-header">
+            <div class="app-badge" id="appBadge">M</div>
+            <div>
+              <strong id="screenProfileName">MacroDesk</strong>
+              <small>YOUR WORKFLOW, ONE TOUCH AWAY</small>
+            </div>
+          </div>
+          <nav class="screen-sidebar" id="screenSidebar" aria-label="Preview pages"></nav>
+          <div class="screen-grid" id="screenGrid"></div>
+          <button class="screen-panel" id="screenQuick" type="button">
+            <span>QUICK ACTION</span>
+            <strong id="quickAction">Save</strong>
+            <small id="quickShortcut">Ctrl + S</small>
+          </button>
+          <div class="screen-panel-grid" id="screenPanelGrid"></div>
+          <div class="screen-tabs" id="screenTabs"></div>
+        </div>
+      </div>
+
+      <p class="stage-tip"><span>Tip</span> Select any key on the preview to customize it.</p>
+    </section>
+
+    <aside class="panel inspector-panel">
+      <div class="panel-heading inspector-heading">
+        <span class="eyebrow">Inspector</span>
+        <h2>Customize key</h2>
+        <p id="selectionPosition">Select a button to begin.</p>
+      </div>
+
+      <form id="inspectorForm" autocomplete="off">
+        <fieldset id="inspectorFields" disabled>
+          <label for="buttonLabel">Label</label>
+          <input id="buttonLabel" maxlength="22" placeholder="Save project">
+
+          <label for="buttonAction">Action</label>
+          <select id="buttonAction">
+            <option value="keys">Keyboard shortcut</option>
+            <option value="search">App command search</option>
+            <option value="text">Type text</option>
+            <option value="page">Open deck page</option>
+            <option value="none">No action</option>
+          </select>
+
+          <label for="buttonValue" id="valueLabel">Shortcut</label>
+          <input id="buttonValue" maxlength="80" placeholder="Ctrl+Shift+S">
+          <small class="field-help" id="valueHelp">Use Ctrl, Shift, Alt or Win plus a key.</small>
+
+          <label>Icon</label>
+          <div class="icon-choices" id="iconChoices"></div>
+          <button class="upload-button" id="uploadIconButton" type="button">Upload PNG or SVG</button>
+          <input id="iconFile" type="file" accept="image/png,image/svg+xml" hidden>
+
+          <label for="buttonColor">Accent color</label>
+          <div class="color-field">
+            <input id="buttonColor" type="color" value="#2ccfc3">
+            <output id="colorValue">#2CCFC3</output>
+          </div>
+
+          <label class="toggle-row">
+            <span><strong>Button enabled</strong><small>Disabled keys remain visible in the layout.</small></span>
+            <input id="buttonEnabled" type="checkbox" checked>
+          </label>
+        </fieldset>
+      </form>
+
+      <div class="inspector-footer">
+        <span>Changes are saved in this browser.</span>
+        <button class="button danger" id="clearButton" type="button" disabled>Clear key</button>
+      </div>
+    </aside>
+  </main>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script src="app.js?v=7"></script>
+</body>
+</html>

@@ -25,6 +25,19 @@ shortcut, so the PC needs no driver and no companion app.
 - Plug-and-play USB keyboard with no driver or companion app. The shortcuts are
   the Windows/Linux ones (`Ctrl`). On macOS most of them would need `Cmd`.
 
+## Browser profile editor (prototype)
+
+[`web/index.html`](web/index.html) is the first working prototype of MacroDesk
+Studio. It lets a user choose two app templates (OrcaSlicer, PrusaSlicer,
+Fusion 360, Blender or Onshape), edit buttons, shortcuts,
+colours, icons and an uploaded background, preview the 800 x 480 layout, and
+import or export a `.macrodesk` profile bundle without VS Code or the Arduino
+IDE.
+
+The editor saves its work locally in the browser. Writing a bundle directly to
+the board is not implemented yet; that requires the firmware runtime profile
+loader and USB serial transfer protocol planned for the next stage.
+
 ## Hardware
 
 | Part | Notes |
