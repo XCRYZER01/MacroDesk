@@ -1,0 +1,109 @@
+/* Flasher page. Reuses the Studio's tokens, buttons and toast from styles.css. */
+
+.flash-page {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 36px clamp(20px, 4vw, 40px) 72px;
+  display: grid;
+  gap: 28px;
+}
+
+.flash-intro h1 { margin: 6px 0 10px; font-size: 27px; letter-spacing: -.5px; }
+.flash-intro p { margin: 0 0 10px; max-width: 62ch; color: #b4c3c9; font-size: 13px; line-height: 1.65; }
+
+.flash-support {
+  margin-top: 14px !important;
+  padding: 12px 14px;
+  border: 1px solid #5a3a2a;
+  border-radius: 10px;
+  background: rgba(90, 58, 42, .22);
+  color: #ffc9a6 !important;
+}
+
+.flash-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+
+.flash-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 20px 18px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius);
+  background: rgba(11, 20, 25, .84);
+}
+
+.flash-card h2 { margin: 0; display: flex; align-items: center; gap: 10px; font-size: 15px; }
+.flash-card p { margin: 0; color: #9fb0b7; font-size: 12px; line-height: 1.65; }
+.flash-card strong { color: var(--text); }
+.flash-note { color: #7e9099 !important; font-size: 11px !important; }
+
+.step-number {
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  border: 1px solid rgba(44, 207, 195, .45);
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.firmware-choice { display: grid; gap: 8px; }
+.radio-row {
+  display: grid;
+  grid-template-columns: 16px 1fr;
+  gap: 10px;
+  align-items: start;
+  padding: 10px 11px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: #0b171c;
+  cursor: pointer;
+}
+.radio-row:hover { border-color: #3c545f; }
+.radio-row input { width: 16px; margin: 2px 0 0; accent-color: var(--accent); }
+.radio-row:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
+.radio-row strong { display: block; font-size: 12px; }
+.radio-row small { display: block; margin-top: 3px; color: var(--muted); font-size: 10px; word-break: break-all; }
+
+.flash-actions { display: grid; gap: 8px; }
+.flash-actions .button { width: 100%; }
+
+.flash-progress {
+  padding: 18px 20px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius);
+  background: rgba(11, 20, 25, .84);
+}
+.progress-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; }
+.progress-head strong { font-size: 13px; }
+.progress-head span { color: var(--accent); font: 12px ui-monospace, SFMono-Regular, Consolas, monospace; }
+.progress-track { height: 8px; border-radius: 99px; background: #0b171c; border: 1px solid var(--line); overflow: hidden; }
+.progress-fill { height: 100%; width: 0; border-radius: 99px; background: var(--accent); transition: width .18s ease; }
+
+.flash-log-wrap { display: grid; gap: 12px; }
+.flash-log {
+  margin: 0;
+  height: 230px;
+  overflow: auto;
+  padding: 14px 16px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius);
+  background: #060e12;
+  color: #9fd6d1;
+  font: 11px/1.7 ui-monospace, SFMono-Regular, Consolas, monospace;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.flash-after { padding-top: 6px; }
+.flash-after h2 { margin: 0 0 8px; font-size: 15px; }
+.flash-after p { margin: 0; max-width: 70ch; color: #9fb0b7; font-size: 12px; line-height: 1.7; }
+.flash-after code { padding: 1px 5px; border-radius: 5px; background: #0d1b21; color: var(--accent); font-size: 11px; }
+
+@media (max-width: 900px) {
+  .flash-grid { grid-template-columns: 1fr; }
+}

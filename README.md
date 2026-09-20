@@ -38,6 +38,11 @@ The editor saves its work locally in the browser. Writing a bundle directly to
 the board is not implemented yet; that requires the firmware runtime profile
 loader and USB serial transfer protocol planned for the next stage.
 
+[`web/flash.html`](web/flash.html) flashes the firmware itself from Chrome or
+Edge over Web Serial, so a new board needs no Arduino IDE. Serve the repository
+over `http://localhost` or `https://` first — browsers do not allow USB access
+from a `file://` page — and use the `USB TO UART` port.
+
 ## Hardware
 
 | Part | Notes |

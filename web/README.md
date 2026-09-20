@@ -23,7 +23,28 @@ full-height right panel. Every layout also includes eight sidebar rows and the
 bottom profile bar.
 
 Open `index.html` directly, or serve the repository root with any static web
-server. Device transfer is intentionally not presented as working yet: the
+server.
+
+## Firmware flasher
+
+`flash.html` writes the firmware to the board from the browser over Web Serial,
+using [esptool-js](https://github.com/espressif/esptool-js). It flashes the
+merged image in `firmware/prebuilt/` at `0x0`, or any `.bin` you compiled
+yourself, and keeps the flash mode, frequency and size recorded in the image's
+own bootloader header.
+
+Unlike the editor, the flasher **cannot run from a `file://` path**: browsers
+only expose USB devices on `https://` or `http://localhost`. Serve the
+repository root first, for example:
+
+```sh
+python -m http.server 8000      # then open http://localhost:8000/web/flash.html
+npx serve .                     # or any other static server
+```
+
+It needs Chrome or Edge; Safari, Firefox and mobile browsers have no Web Serial.
+Connect the cable to the port marked `USB TO UART`, not the native `USB` port —
+the native one is the keyboard the PC sees after the board boots. Device transfer is intentionally not presented as working yet: the
 firmware still needs a runtime profile loader and a serial transfer protocol.
 
 The built-in backgrounds contain only framing, colour and header photography.
