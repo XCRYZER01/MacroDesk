@@ -1,0 +1,134 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://macrodesk.local/schemas/profile-v4.json",
+  "title": "MacroDesk deck-template-v1 profile bundle",
+  "type": "object",
+  "required": ["format", "version", "device", "profiles"],
+  "properties": {
+    "format": { "const": "macrodesk-profile" },
+    "version": { "const": 4 },
+    "device": {
+      "type": "object",
+      "required": ["model", "width", "height", "layout"],
+      "properties": {
+        "model": { "const": "esp32-s3-touch-lcd-7" },
+        "width": { "const": 800 },
+        "height": { "const": 480 },
+        "layout": { "const": "deck-template-v1" }
+      },
+      "additionalProperties": false
+    },
+    "activeProfile": { "type": "integer", "minimum": 0, "maximum": 1 },
+    "profiles": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": { "$ref": "#/$defs/profile" }
+    },
+    "exportedAt": { "type": "string", "format": "date-time" }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "profile": {
+      "type": "object",
+      "required": ["id", "name", "badge", "accent", "backgroundImage", "backgroundDim", "panelTitle", "panelColumns", "panelRows", "showQuickAction", "pages", "sidebarButtons", "pageButtons", "activePage", "panelButtons", "quickAction"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 32 },
+        "name": { "type": "string", "minLength": 1, "maxLength": 32 },
+        "badge": { "type": "string", "minLength": 1, "maxLength": 4 },
+        "accent": { "$ref": "#/$defs/colour" },
+        "backgroundImage": {
+          "oneOf": [
+            { "type": "null" },
+            { "type": "string", "pattern": "^data:image/(png|jpeg);base64," },
+            { "enum": [
+              "../firmware/MacroDeckUI/assets/ui_orca_clean_800x480.png",
+              "../firmware/MacroDeckUI/assets/ui_prusa_clean_800x480.png",
+              "../firmware/MacroDeckUI/assets/ui_fusion_clean_800x480.png",
+              "../firmware/MacroDeckUI/assets/ui_onshape_clean_800x480.png",
+              "../firmware/MacroDeckUI/assets/ui_blender_clean_800x480.png"
+            ] }
+          ]
+        },
+        "backgroundDim": { "type": "number", "minimum": 0, "maximum": 0.8 },
+        "panelTitle": { "type": "string", "maxLength": 14 },
+        "panelColumns": { "type": "integer", "minimum": 2, "maximum": 3 },
+        "panelRows": { "type": "integer", "minimum": 2, "maximum": 3 },
+        "showQuickAction": { "type": "boolean" },
+        "pages": {
+          "description": "One record per sidebar page. title, hint and columns describe the LVGL sub-page the board draws; page 1 is the artwork page and ignores them.",
+          "type": "array",
+          "minItems": 8,
+          "maxItems": 8,
+          "items": {
+            "type": "object",
+            "required": ["name", "title", "hint", "columns"],
+            "properties": {
+              "name": { "type": "string", "maxLength": 18 },
+              "title": { "type": "string", "maxLength": 18 },
+              "hint": { "type": "string", "maxLength": 64 },
+              "columns": { "type": "integer", "minimum": 3, "maximum": 5 }
+            },
+            "additionalProperties": false
+          }
+        },
+        "sidebarButtons": {
+          "type": "array",
+          "minItems": 8,
+          "maxItems": 8,
+          "items": { "$ref": "#/$defs/button" }
+        },
+        "activePage": { "type": "integer", "minimum": 0, "maximum": 7 },
+        "pageButtons": {
+          "description": "One deck of keys per sidebar page. Page 1 matches the artwork grid; the LVGL sub-pages hold twelve, which is about what the board's 48 KB LVGL heap can draw.",
+          "type": "array",
+          "minItems": 8,
+          "maxItems": 8,
+          "prefixItems": [
+            {
+              "type": "array",
+              "minItems": 20,
+              "maxItems": 24,
+              "items": { "$ref": "#/$defs/button" }
+            }
+          ],
+          "items": {
+            "type": "array",
+            "minItems": 12,
+            "maxItems": 12,
+            "items": { "$ref": "#/$defs/button" }
+          }
+        },
+        "panelButtons": {
+          "type": "array",
+          "minItems": 9,
+          "maxItems": 9,
+          "items": { "$ref": "#/$defs/button" }
+        },
+        "quickAction": { "$ref": "#/$defs/button" }
+      },
+      "additionalProperties": false
+    },
+    "button": {
+      "type": "object",
+      "required": ["id", "label", "action", "value", "icon", "iconImage", "color", "enabled"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 48 },
+        "label": { "type": "string", "maxLength": 22 },
+        "action": { "enum": ["keys", "search", "text", "page", "none"] },
+        "value": { "type": "string", "maxLength": 80 },
+        "icon": { "type": "string", "maxLength": 8 },
+        "iconImage": {
+          "oneOf": [
+            { "type": "null" },
+            { "type": "string", "pattern": "^data:image/png;base64," }
+          ]
+        },
+        "color": { "$ref": "#/$defs/colour" },
+        "enabled": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "colour": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" }
+  }
+}

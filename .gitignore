@@ -2,6 +2,7 @@
 firmware/MacroDeckUI/build/
 *.bin
 !firmware/prebuilt/*.bin
+!prebuilt/*.bin
 *.elf
 *.map
 
@@ -14,3 +15,6 @@ firmware/MacroDeckUI/build/
 .DS_Store
 Thumbs.db
 *.log
+
+# Local project handoff notes
+hand off.md

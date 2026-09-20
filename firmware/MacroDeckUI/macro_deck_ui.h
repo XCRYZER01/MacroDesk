@@ -19,6 +19,7 @@ typedef enum {
     MACRO_ACTION_JOG_MOVE,   /* jog pad arrow, repeats while held */
     MACRO_ACTION_JOG_STEP,   /* toggle the jog step between 10 mm and 1 mm */
     MACRO_ACTION_JOG_CLOSE,
+    MACRO_ACTION_TEXT,       /* type `keys` as literal text */
 } macro_action_t;
 
 /* One button. Only the first three fields are required:
@@ -68,9 +69,12 @@ typedef struct {
     uint32_t highlight_border;
 } macro_profile_t;
 
-/* Defined in macro_deck_profiles.c */
-extern const macro_profile_t macro_profiles[];
-extern const size_t macro_profile_count;
+/* The built-in profiles are the safe fallback. A valid bundle loaded from
+ * FAT replaces the active pointer/count at boot without modifying firmware. */
+extern const macro_profile_t macro_builtin_profiles[];
+extern const size_t macro_builtin_profile_count;
+extern const macro_profile_t *macro_profiles;
+extern size_t macro_profile_count;
 
 typedef void (*macro_deck_button_cb_t)(const macro_button_t *button, void *user_data);
 

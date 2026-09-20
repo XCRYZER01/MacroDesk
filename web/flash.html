@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MacroDesk Firmware Flasher</title>
+  <link rel="stylesheet" href="styles.css?v=7">
+  <link rel="stylesheet" href="flash.css?v=1">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="index.html" aria-label="MacroDesk Studio home">
+      <span class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></span>
+      <span><strong>MacroDesk</strong><small>Flasher</small></span>
+    </a>
+    <div class="top-actions">
+      <a class="button ghost" href="index.html">Open Studio</a>
+    </div>
+  </header>
+
+  <main class="flash-page">
+    <section class="flash-intro">
+      <span class="eyebrow">Firmware</span>
+      <h1>Put MacroDesk on your board</h1>
+      <p>
+        This page writes the firmware straight from your browser over USB. You do
+        not need the Arduino IDE, VS Code or any driver beyond the one Windows
+        installs for the board's USB-to-serial chip.
+      </p>
+      <p class="flash-support" id="support" hidden></p>
+    </section>
+
+    <section class="flash-grid">
+      <article class="flash-card">
+        <h2><span class="step-number">1</span> Connect the board</h2>
+        <p>
+          Plug a USB cable into the port labelled <strong>USB TO UART</strong>, not
+          the one marked <strong>USB</strong>. The UART port is the one that flashes;
+          the other is the keyboard the PC sees once MacroDesk is running.
+        </p>
+        <p class="flash-note">
+          If the board never appears, hold <strong>BOOT</strong>, tap
+          <strong>RESET</strong>, then release <strong>BOOT</strong> and try again.
+        </p>
+      </article>
+
+      <article class="flash-card">
+        <h2><span class="step-number">2</span> Choose the firmware</h2>
+        <div class="firmware-choice">
+          <label class="radio-row">
+            <input type="radio" name="source" value="prebuilt" checked>
+            <span>
+              <strong>Bundled build</strong>
+              <small id="prebuiltState">MacroDesk-esp32s3-touch-lcd-7.bin</small>
+            </span>
+          </label>
+          <label class="radio-row">
+            <input type="radio" name="source" value="file">
+            <span>
+              <strong>My own build</strong>
+              <small id="fileState">A .bin you compiled yourself</small>
+            </span>
+          </label>
+        </div>
+        <button class="upload-button" id="pickFile" type="button">Choose .bin file</button>
+        <input id="binFile" type="file" accept=".bin,application/octet-stream" hidden>
+      </article>
+
+      <article class="flash-card">
+        <h2><span class="step-number">3</span> Flash</h2>
+        <p>
+          Flashing replaces the whole application. Your profiles live in the
+          FAT runtime bundle after you use <strong>Send to device</strong> in
+          Studio. Erasing the whole flash removes that bundle; flashing without
+          erase normally keeps it.
+        </p>
+        <div class="flash-actions">
+          <button class="button primary" id="flashButton" type="button">Connect and flash</button>
+          <button class="button ghost" id="eraseButton" type="button">Erase flash</button>
+        </div>
+        <label class="toggle-row">
+          <span><strong>Erase before writing</strong><small>Slower, but clears stale data.</small></span>
+          <input id="eraseFirst" type="checkbox">
+        </label>
+      </article>
+    </section>
+
+    <section class="flash-progress" id="progressBox" hidden>
+      <div class="progress-head">
+        <strong id="progressLabel">Preparing…</strong>
+        <span id="progressPercent">0%</span>
+      </div>
+      <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+    </section>
+
+    <section class="flash-log-wrap">
+      <div class="section-title">
+        <div>
+          <span class="eyebrow">Output</span>
+          <h2>Flasher log</h2>
+        </div>
+        <button class="icon-button" id="clearLog" type="button" title="Clear log" aria-label="Clear log">×</button>
+      </div>
+      <pre class="flash-log" id="log" aria-live="polite">Waiting for you to start.</pre>
+    </section>
+
+    <section class="flash-after">
+      <h2>After it finishes</h2>
+      <p>
+        Unplug the cable and plug it into the port marked <strong>USB</strong>. The
+        PC picks the board up as a keyboard and the deck starts sending shortcuts.
+        A healthy boot logs <code>USB HID keyboard ready (EXIO5 LOW)</code> and
+        <code>Macro Deck UI ready</code> on the serial monitor.
+      </p>
+    </section>
+  </main>
+
+  <div class="toast" id="toast" role="status"></div>
+  <script type="module" src="flash.js?v=5"></script>
+</body>
+</html>
