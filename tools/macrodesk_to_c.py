@@ -274,6 +274,11 @@ def main():
     keys = sum(len(used_keys(page)) for profile in bundle["profiles"] for page in profile["pageButtons"][1:])
     print(f"{args.bundle} -> {args.out}")
     print(f"  {len(bundle['profiles'])} profiles, {keys} keys on sidebar pages, {len(warnings)} warnings")
+    empty = sum(1 for profile in bundle["profiles"] for page in profile["pageButtons"][1:] if not used_keys(page))
+    if empty:
+        print(f"  note: {empty} sidebar pages have no keys. The hand-written profiles this")
+        print("        replaces fill seven pages per profile, so flashing this is a downgrade")
+        print("        unless you filled them in the Studio first.")
     print("  build:  arduino-cli compile --fqbn <fqbn> firmware/MacroDeckUI")
     print("  flash:  web/flash.html")
 
