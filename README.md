@@ -38,6 +38,10 @@ The editor saves its work locally in the browser. Writing a bundle directly to
 the board is not implemented yet; that requires the firmware runtime profile
 loader and USB serial transfer protocol planned for the next stage.
 
+[`tools/macrodesk_to_c.py`](tools/macrodesk_to_c.py) turns an exported bundle
+into `macro_deck_profiles.c`, so a deck designed in the browser can be compiled
+and flashed without hand-editing C.
+
 [`web/flash.html`](web/flash.html) flashes the firmware itself from Chrome or
 Edge over Web Serial, so a new board needs no Arduino IDE. Serve the repository
 over `http://localhost` or `https://` first — browsers do not allow USB access

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#071116">
   <title>MacroDesk Studio</title>
-  <link rel="stylesheet" href="styles.css?v=7">
+  <link rel="stylesheet" href="styles.css?v=8">
 </head>
 <body>
   <header class="topbar">
@@ -101,6 +101,18 @@
         <button class="icon-button" id="resetProfile" type="button" title="Reset this profile" aria-label="Reset this profile">↺</button>
       </div>
       <div class="page-strip" id="pageStrip" aria-label="Deck page"></div>
+      <div class="page-meta" id="pageMeta" hidden>
+        <label for="pageTitle">Page title</label>
+        <input id="pageTitle" maxlength="18" placeholder="MODIFY">
+        <label for="pageHint">Hint</label>
+        <input id="pageHint" maxlength="64" placeholder="One line under the title">
+        <label for="pageColumns">Columns</label>
+        <select id="pageColumns">
+          <option value="3">3 columns</option>
+          <option value="4">4 columns</option>
+          <option value="5">5 columns</option>
+        </select>
+      </div>
       <div class="area-tabs" id="areaTabs" aria-label="Button area">
         <button class="active" type="button" data-area="main">Page 1 · 24</button>
         <button type="button" data-area="sidebar">Left sidebar 8</button>
@@ -132,6 +144,11 @@
           </div>
           <nav class="screen-sidebar" id="screenSidebar" aria-label="Preview pages"></nav>
           <div class="screen-grid" id="screenGrid"></div>
+          <div class="screen-page" id="screenPage" hidden>
+            <strong class="screen-page-title" id="screenPageTitle"></strong>
+            <small class="screen-page-hint" id="screenPageHint"></small>
+            <div class="screen-page-grid" id="screenPageGrid"></div>
+          </div>
           <button class="screen-panel" id="screenQuick" type="button">
             <span>QUICK ACTION</span>
             <strong id="quickAction">Save</strong>
@@ -196,6 +213,6 @@
   </main>
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
-  <script src="app.js?v=7"></script>
+  <script src="app.js?v=8"></script>
 </body>
 </html>

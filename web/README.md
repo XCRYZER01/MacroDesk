@@ -25,6 +25,29 @@ bottom profile bar.
 Open `index.html` directly, or serve the repository root with any static web
 server.
 
+## Getting a deck onto the board
+
+The firmware still reads its buttons from C, so a bundle reaches the board by
+way of a rebuild:
+
+```sh
+py tools/macrodesk_to_c.py my-deck.macrodesk      # writes macro_deck_profiles.c
+arduino-cli compile --fqbn <fqbn> firmware/MacroDeckUI
+python tools/make_prebuilt.py                     # refresh firmware/prebuilt/
+# then flash with web/flash.html
+```
+
+What the tool cannot do yet, and says so rather than guessing:
+
+- an uploaded background has no RGB565 array; run `tools/png_to_rgb565.py` on
+  the PNG first, and check the zone rectangles still sit over its buttons
+- a right sidebar other than 3 x 3 has no rectangles in the artwork
+- the `text` action has no firmware equivalent and becomes a dead key
+
+Page 1 keeps the artwork's grid. Pages 2 to 8 are drawn by LVGL at runtime and
+hold twelve keys, which is roughly what the board's 48 KB LVGL heap can draw;
+only the keys up to the last one in use are compiled in.
+
 ## Firmware flasher
 
 `flash.html` writes the firmware to the board from the browser over Web Serial,

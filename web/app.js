@@ -1,8 +1,8 @@
 (function () {
   "use strict";
 
-  const STORAGE_KEY = "macrodesk-studio-project-v3";
-  const STORAGE_KEY_V2 = "macrodesk-studio-project-v2";
+  const STORAGE_KEY = "macrodesk-studio-project-v4";
+  const OLD_STORAGE_KEYS = ["macrodesk-studio-project-v3", "macrodesk-studio-project-v2"];
   const BUILT_IN_BACKGROUNDS = new Set([
     "../firmware/MacroDeckUI/assets/ui_orca_clean_800x480.png",
     "../firmware/MacroDeckUI/assets/ui_prusa_clean_800x480.png",
@@ -13,6 +13,8 @@
   const ICONS = ["S", "↶", "↷", "＋", "−", "⌂", "◫", "✂", "◉", "↔", "◇", "⚙"];
   const VALID_ACTIONS = new Set(["keys", "search", "text", "page", "none"]);
   const AREA_NAMES = { main: "Main grid", sidebar: "Left sidebar", panel: "Right sidebar", quick: "Quick action" };
+  const SIDEBAR_PAGE_KEYS = 12;
+  const PAGE_COLUMN_CHOICES = [3, 4, 5];
 
   const appTemplates = {
     orca: makeTemplate({
@@ -116,7 +118,12 @@
       panelColumns: 3,
       panelRows: 3,
       showQuickAction: config.showQuickAction !== false,
-      pages: config.pages,
+      pages: config.pages.map((name, index) => ({
+        name,
+        title: index === 0 ? "" : name.toUpperCase().slice(0, 18),
+        hint: "",
+        columns: 4
+      })),
       sidebarButtons: makeButtons(
         config.id,
         "sidebar",
@@ -128,15 +135,16 @@
       // The template fills page 1; the rest are the user's to build.
       activePage: 0,
       pageButtons: config.pages.map((_, page) => makeButtons(
-        config.id, `page${page + 1}`, page === 0 ? config.main : [], mainCount(config.id), config.accent
+        config.id, `page${page + 1}`, page === 0 ? config.main : [], pageKeyCount(config.id, page), config.accent
       )),
       panelButtons: makeButtons(config.id, "panel", config.panel, 9, config.accent),
       quickAction: makeButtons(config.id, "quick", [config.quick], 1, config.accent)[0]
     };
   }
 
-  // Declared, not assigned, because the templates above call it while they are built.
+  // Declared, not assigned, because the templates above call them while they are built.
   function mainCount(profileId) { return profileId === "fusion" ? 20 : 24; }
+  function pageKeyCount(profileId, page) { return page === 0 ? mainCount(profileId) : SIDEBAR_PAGE_KEYS; }
 
   function makeButtons(profileId, area, definitions, count, accent) {
     return Array.from({ length: count }, (_, index) => {
@@ -154,7 +162,7 @@
 
   function makeProject(first = "orca", second = "fusion") {
     return {
-      format: "macrodesk-profile", version: 3,
+      format: "macrodesk-profile", version: 4,
       device: { model: "esp32-s3-touch-lcd-7", width: 800, height: 480, layout: "deck-template-v1" },
       activeProfile: 0, profiles: [clone(appTemplates[first]), clone(appTemplates[second])]
     };
@@ -173,6 +181,9 @@
     screenGrid: $("#screenGrid"), screenPanelGrid: $("#screenPanelGrid"), screenQuick: $("#screenQuick"),
     screenSidebar: $("#screenSidebar"), screenTabs: $("#screenTabs"), quickAction: $("#quickAction"),
     quickShortcut: $("#quickShortcut"), inspectorFields: $("#inspectorFields"),
+    screenPage: $("#screenPage"), screenPageTitle: $("#screenPageTitle"), screenPageHint: $("#screenPageHint"),
+    screenPageGrid: $("#screenPageGrid"), pageMeta: $("#pageMeta"), pageTitle: $("#pageTitle"),
+    pageHint: $("#pageHint"), pageColumns: $("#pageColumns"),
     selectionPosition: $("#selectionPosition"), buttonLabel: $("#buttonLabel"), buttonAction: $("#buttonAction"),
     buttonValue: $("#buttonValue"), valueLabel: $("#valueLabel"), valueHelp: $("#valueHelp"),
     iconChoices: $("#iconChoices"), buttonColor: $("#buttonColor"), colorValue: $("#colorValue"),
@@ -217,6 +228,9 @@
     elements.removeBackground.addEventListener("click", () => { currentProfile().backgroundImage = null; changed("Background removed"); });
     elements.backgroundDim.addEventListener("input", event => { currentProfile().backgroundDim = Number(event.target.value) / 100; changed(); });
     elements.panelTitle.addEventListener("input", event => { currentProfile().panelTitle = event.target.value; changed(); });
+    elements.pageTitle.addEventListener("input", event => { currentPage().title = event.target.value; changed(); });
+    elements.pageHint.addEventListener("input", event => { currentPage().hint = event.target.value; changed(); });
+    elements.pageColumns.addEventListener("change", event => { currentPage().columns = Number(event.target.value); changed(); });
     elements.panelColumns.addEventListener("change", event => { currentProfile().panelColumns = Number(event.target.value); selection = { area: "panel", index: 0 }; changed("Right sidebar layout updated"); });
     elements.panelRows.addEventListener("change", event => { currentProfile().panelRows = Number(event.target.value); selection = { area: "panel", index: 0 }; changed("Right sidebar layout updated"); });
     elements.showQuickAction.addEventListener("change", event => { currentProfile().showQuickAction = event.target.checked; selection = { area: event.target.checked ? "quick" : "panel", index: 0 }; changed("Right sidebar layout updated"); });
@@ -245,7 +259,7 @@
 
   function pageName(profile, index) {
     const owner = profile.sidebarButtons.find((button, i) => pageTarget(button, i) === index && button.action === "page");
-    return (owner && owner.label) || profile.pages[index] || `Page ${index + 1}`;
+    return (owner && owner.label) || (profile.pages[index] && profile.pages[index].name) || `Page ${index + 1}`;
   }
 
   function openPage(index) {
@@ -256,6 +270,15 @@
     changed();
   }
   const panelSlotCount = profile => profile.panelColumns * profile.panelRows;
+  const currentPage = () => currentProfile().pages[currentProfile().activePage];
+
+  // The board is sent the keys up to the last one in use, so a page with three
+  // keys draws three cards -- trailing blanks are never transferred.
+  function usedKeyCount(keys) {
+    let last = -1;
+    keys.forEach((button, index) => { if (button.enabled && button.action !== "none") last = index; });
+    return last + 1;
+  }
   const currentButton = () => buttonsFor(currentProfile())[selection.index] || null;
 
   function replaceProfile(index, templateId) {
@@ -317,6 +340,11 @@
     elements.deviceScreen.classList.toggle("legacy-art-layout", profile.id === "orca" || profile.id === "fusion" || profile.id === "onshape" || profile.id === "blender");
     elements.deviceScreen.classList.toggle("full-right-panel", !profile.showQuickAction);
     elements.panelTitle.value = profile.panelTitle;
+    const page = profile.pages[profile.activePage];
+    elements.pageMeta.hidden = profile.activePage === 0;
+    elements.pageTitle.value = page.title;
+    elements.pageHint.value = page.hint;
+    elements.pageColumns.value = String(page.columns);
     elements.panelColumns.value = String(profile.panelColumns);
     elements.panelRows.value = String(profile.panelRows);
     elements.showQuickAction.checked = profile.showQuickAction;
@@ -396,7 +424,7 @@
       page.addEventListener("click", () => openPage(pageTarget(button, index)));
       elements.screenSidebar.appendChild(page);
     });
-    renderPreviewButtons(elements.screenGrid, profile.pageButtons[profile.activePage], "main", "screen-key");
+    renderMainArea(profile);
     elements.screenPanelGrid.dataset.panelTitle = profile.panelTitle || "";
     renderPreviewButtons(elements.screenPanelGrid, profile.panelButtons.slice(0, panelSlotCount(profile)), "panel", "screen-panel-key");
     const quick = profile.quickAction;
@@ -416,6 +444,33 @@
     systemTab.type = "button"; systemTab.className = "screen-tab system"; systemTab.textContent = "System";
     systemTab.title = "Reserved for device settings";
     elements.screenTabs.appendChild(systemTab);
+  }
+
+  // Page 1 is the artwork page. Every other page is the LVGL overlay, laid out
+  // with the same arithmetic build_page() uses on the device.
+  function renderMainArea(profile) {
+    const keys = profile.pageButtons[profile.activePage];
+    const onImagePage = profile.activePage === 0;
+    elements.screenGrid.hidden = !onImagePage;
+    elements.screenPage.hidden = onImagePage;
+    if (onImagePage) {
+      renderPreviewButtons(elements.screenGrid, keys, "main", "screen-key");
+      return;
+    }
+    const page = profile.pages[profile.activePage];
+    const count = usedKeyCount(keys);
+    const columns = page.columns;
+    const rows = Math.max(1, Math.ceil(count / columns));
+    const height = Math.min(100, (288 - (rows - 1) * 8) / rows);
+    elements.screenPageTitle.textContent = page.title || pageName(profile, profile.activePage);
+    elements.screenPageHint.textContent = page.hint;
+    elements.screenPage.style.setProperty("--page-columns", columns);
+    elements.screenPage.style.setProperty("--page-row-height", `${(height / 800 * 100).toFixed(4)}cqw`);
+    if (!count) {
+      elements.screenPageGrid.innerHTML = '<span class="screen-page-empty">No keys yet — fill a slot in the list on the left.</span>';
+      return;
+    }
+    renderPreviewButtons(elements.screenPageGrid, keys.slice(0, count), "main", "screen-page-key");
   }
 
   function renderPreviewButtons(container, buttons, area, className) {
@@ -519,22 +574,26 @@
     const file = event.target.files[0]; event.target.value = "";
     if (!file) return;
     try {
-      const next = migrateProject(JSON.parse(await file.text())); validateProject(next);
+      const next = migrateV3(migrateProject(JSON.parse(await file.text()))); validateProject(next);
       project = next; project.activeProfile = 0; selection = { area: "main", index: 0 };
       changed("Profile bundle imported");
     } catch (error) { showToast(error.message || "Invalid profile bundle"); }
   }
 
   function validateProject(value) {
-    if (!value || value.format !== "macrodesk-profile" || value.version !== 3) throw new Error("Unsupported MacroDesk file");
+    if (!value || value.format !== "macrodesk-profile" || value.version !== 4) throw new Error("Unsupported MacroDesk file");
     if (!Array.isArray(value.profiles) || value.profiles.length !== 2) throw new Error("A bundle must contain two profiles");
     value.profiles.forEach(profile => {
       const validBackground = profile?.backgroundImage === null || (typeof profile?.backgroundImage === "string" && (
         BUILT_IN_BACKGROUNDS.has(profile.backgroundImage) || /^data:image\/(?:png|jpeg);base64,[A-Za-z0-9+/=]+$/.test(profile.backgroundImage)
       ));
       const expectedMainButtons = profile?.id === "fusion" ? 20 : 24;
+      const validPage = page => page && typeof page.name === "string" && page.name.length <= 18
+        && typeof page.title === "string" && page.title.length <= 18
+        && typeof page.hint === "string" && page.hint.length <= 64
+        && PAGE_COLUMN_CHOICES.includes(page.columns);
       const validPanelLayout = typeof profile?.panelTitle === "string" && profile.panelTitle.length <= 14 && [2, 3].includes(profile.panelColumns) && [2, 3].includes(profile.panelRows) && typeof profile.showQuickAction === "boolean";
-      if (!profile || typeof profile.id !== "string" || typeof profile.name !== "string" || typeof profile.badge !== "string" || !validColour(profile.accent) || !validBackground || !validPanelLayout || typeof profile.backgroundDim !== "number" || !Array.isArray(profile.pages) || profile.pages.length !== 8 || !Array.isArray(profile.sidebarButtons) || profile.sidebarButtons.length !== 8 || !Array.isArray(profile.pageButtons) || profile.pageButtons.length !== 8 || profile.pageButtons.some(page => !Array.isArray(page) || page.length !== expectedMainButtons) || !Number.isInteger(profile.activePage) || profile.activePage < 0 || profile.activePage > 7 || !Array.isArray(profile.panelButtons) || profile.panelButtons.length !== 9) throw new Error("Profile does not match the 800 × 480 deck template");
+      if (!profile || typeof profile.id !== "string" || typeof profile.name !== "string" || typeof profile.badge !== "string" || !validColour(profile.accent) || !validBackground || !validPanelLayout || typeof profile.backgroundDim !== "number" || !Array.isArray(profile.pages) || profile.pages.length !== 8 || !Array.isArray(profile.sidebarButtons) || profile.sidebarButtons.length !== 8 || !Array.isArray(profile.pageButtons) || profile.pageButtons.length !== 8 || profile.pageButtons.some((page, index) => !Array.isArray(page) || page.length !== (index === 0 ? expectedMainButtons : SIDEBAR_PAGE_KEYS)) || !profile.pages.every(validPage) || !Number.isInteger(profile.activePage) || profile.activePage < 0 || profile.activePage > 7 || !Array.isArray(profile.panelButtons) || profile.panelButtons.length !== 9) throw new Error("Profile does not match the 800 × 480 deck template");
       [...profile.sidebarButtons, ...profile.pageButtons.flat(), ...profile.panelButtons, profile.quickAction].forEach(validateButton);
     });
   }
@@ -559,13 +618,35 @@
       profile.activePage = 0;
     });
     value.version = 3;
+    return migrateV3(value);
+  }
+
+  // v3 sized every page like the artwork page and had no page titles. Sub-pages
+  // are cut to what the board's LVGL heap can actually draw.
+  function migrateV3(value) {
+    if (!value || value.format !== "macrodesk-profile" || value.version !== 3 || !Array.isArray(value.profiles)) return value;
+    value.profiles.forEach(profile => {
+      if (!profile || !Array.isArray(profile.pageButtons)) return;
+      profile.pages = (profile.pages || []).map((page, index) => typeof page === "string"
+        ? { name: page, title: index === 0 ? "" : page.toUpperCase().slice(0, 18), hint: "", columns: 4 }
+        : page);
+      profile.pageButtons = profile.pageButtons.map((keys, index) => {
+        if (index === 0) return keys;
+        const trimmed = keys.slice(0, SIDEBAR_PAGE_KEYS);
+        while (trimmed.length < SIDEBAR_PAGE_KEYS) {
+          trimmed.push(makeButtons(profile.id, `page${index + 1}`, [], SIDEBAR_PAGE_KEYS, profile.accent)[trimmed.length]);
+        }
+        return trimmed;
+      });
+    });
+    value.version = 4;
     return value;
   }
 
   function loadProject() {
-    for (const key of [STORAGE_KEY, STORAGE_KEY_V2]) {
+    for (const key of [STORAGE_KEY, ...OLD_STORAGE_KEYS]) {
       try {
-        const value = migrateProject(JSON.parse(localStorage.getItem(key)));
+        const value = migrateV3(migrateProject(JSON.parse(localStorage.getItem(key))));
         validateProject(value);
         return value;
       } catch (_) { /* fall through to the older key, then to a fresh project */ }

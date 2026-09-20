@@ -48,12 +48,14 @@ UI: LVGL 8.4 on the Arduino-ESP32 core 3.0.7.
 ## Build, flash, verify
 
 ```sh
-FQBN="esp32:esp32:waveshare_esp32_s3_touch_lcd_7:PSRAM=enabled,FlashSize=16M,PartitionScheme=app3M_fat9M_16MB"
+FQBN="esp32:esp32:waveshare_esp32_s3_touch_lcd_7:PSRAM=enabled,FlashSize=16M,PartitionScheme=app3M_fat9M_16MB,USBMode=default"
 arduino-cli compile --fqbn "$FQBN" --export-binaries firmware/MacroDeckUI
 arduino-cli upload  --fqbn "$FQBN" --port <COM port> --input-dir firmware/MacroDeckUI/build/esp32.esp32.waveshare_esp32_s3_touch_lcd_7
 arduino-cli monitor --port <COM port> --config baudrate=115200
 ```
 
+- `USBMode=default` is USB-OTG (TinyUSB). Without it the board defaults to
+  hardware CDC and the sketch stops at its `#error` guard.
 - Flash through the `USB TO UART` port (CH343). The keyboard comes out of the
   other, native `USB` port. If taps appear in the serial log but nothing happens
   on the PC, the native port is usually not connected.

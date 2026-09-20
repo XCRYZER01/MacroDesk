@@ -145,6 +145,10 @@ input:focus, select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px v
 .range-label output { color: var(--muted); font: 9px ui-monospace, SFMono-Regular, Consolas, monospace; }
 .range-input { height: 16px; margin-top: 4px; padding: 0; border: 0; accent-color: var(--accent); box-shadow: none !important; }
 .drag-hint { margin: 4px 0 12px; color: var(--muted); font-size: 10px; }
+.page-meta { display: grid; gap: 6px; margin-top: 12px; padding: 12px; border: 1px solid var(--line-soft); border-radius: 10px; background: rgba(13, 27, 33, .55); }
+.page-meta label { font-size: 10px; }
+.page-meta input, .page-meta select { padding: 8px 10px; font-size: 11px; }
+
 .page-strip { display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px; margin-top: 12px; }
 .page-chip { padding: 7px 0; border: 1px solid var(--line); border-radius: 7px; background: #0b171c; color: var(--muted); font-size: 10px; font-weight: 800; }
 .page-chip:hover { color: var(--text); border-color: #3c545f; }
@@ -239,6 +243,31 @@ input:focus, select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px v
 .key-icon img { width: 74%; height: 74%; object-fit: contain; }
 .screen-key strong { max-width: 100%; font-size: clamp(5px, 1.09cqw, 11px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .screen-key small { max-width: 100%; color: #718994; font-size: clamp(4px, .8cqw, 8px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* The firmware draws a sub-page at (131, 84) sized 486 x 344 on the 800 x 480
+   screen, with its title at (8, 6), hint at (8, 28) and the grid inset 6px from
+   the left starting 50px down. These percentages are those numbers. */
+.screen-page {
+  position: absolute; left: 16.375%; top: 17.5%; width: 60.75%; height: 71.6667%;
+  border-radius: 9px; background: #010408; overflow: hidden;
+}
+.screen-page-title { position: absolute; left: 1.65%; top: 1.74%; color: #e6f2ff; font-size: clamp(6px, 1.68cqw, 16px); }
+.screen-page-hint { position: absolute; left: 1.65%; top: 8.14%; right: 2%; color: #718994; font-size: clamp(5px, 1.26cqw, 12px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.screen-page-grid {
+  position: absolute; left: 1.2346%; top: 14.5349%; width: 97.5309%;
+  display: grid;
+  grid-template-columns: repeat(var(--page-columns, 4), 1fr);
+  grid-auto-rows: var(--page-row-height, 10cqw);
+  column-gap: 1.6461%; row-gap: 2.3256%;
+}
+.screen-page-key {
+  min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4%;
+  padding: 3%; border: 1px solid #20343d; border-radius: 7px; background: rgba(14, 27, 33, .96); color: #fff;
+}
+.screen-page-key.selected { border-color: var(--button-accent); box-shadow: inset 0 0 0 1px var(--button-accent); }
+.screen-page-key strong { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: clamp(5px, 1.09cqw, 11px); }
+.screen-page-key small { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #718994; font-size: clamp(4px, .8cqw, 8px); }
+.screen-page-empty { grid-column: 1 / -1; align-self: start; color: #5d727c; font-size: clamp(5px, 1.09cqw, 11px); }
 
 .screen-panel { position: absolute; right: 1.5%; top: 18.33%; width: 21%; height: 13.1%; color: #fff; border: 1px solid #21363f; border-radius: 9px; background: rgba(13, 27, 33, .96); display: flex; flex-direction: column; align-items: center; justify-content: center; }
 .screen-panel.selected { border-color: var(--profile-accent); box-shadow: inset 0 0 0 1px var(--profile-accent); }

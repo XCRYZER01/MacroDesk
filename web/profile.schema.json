@@ -1,12 +1,12 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://macrodesk.local/schemas/profile-v3.json",
+  "$id": "https://macrodesk.local/schemas/profile-v4.json",
   "title": "MacroDesk deck-template-v1 profile bundle",
   "type": "object",
   "required": ["format", "version", "device", "profiles"],
   "properties": {
     "format": { "const": "macrodesk-profile" },
-    "version": { "const": 3 },
+    "version": { "const": 4 },
     "device": {
       "type": "object",
       "required": ["model", "width", "height", "layout"],
@@ -56,10 +56,21 @@
         "panelRows": { "type": "integer", "minimum": 2, "maximum": 3 },
         "showQuickAction": { "type": "boolean" },
         "pages": {
+          "description": "One record per sidebar page. title, hint and columns describe the LVGL sub-page the board draws; page 1 is the artwork page and ignores them.",
           "type": "array",
           "minItems": 8,
           "maxItems": 8,
-          "items": { "type": "string", "maxLength": 18 }
+          "items": {
+            "type": "object",
+            "required": ["name", "title", "hint", "columns"],
+            "properties": {
+              "name": { "type": "string", "maxLength": 18 },
+              "title": { "type": "string", "maxLength": 18 },
+              "hint": { "type": "string", "maxLength": 64 },
+              "columns": { "type": "integer", "minimum": 3, "maximum": 5 }
+            },
+            "additionalProperties": false
+          }
         },
         "sidebarButtons": {
           "type": "array",
@@ -69,14 +80,22 @@
         },
         "activePage": { "type": "integer", "minimum": 0, "maximum": 7 },
         "pageButtons": {
-          "description": "One deck of keys per sidebar page.",
+          "description": "One deck of keys per sidebar page. Page 1 matches the artwork grid; the LVGL sub-pages hold twelve, which is about what the board's 48 KB LVGL heap can draw.",
           "type": "array",
           "minItems": 8,
           "maxItems": 8,
+          "prefixItems": [
+            {
+              "type": "array",
+              "minItems": 20,
+              "maxItems": 24,
+              "items": { "$ref": "#/$defs/button" }
+            }
+          ],
           "items": {
             "type": "array",
-            "minItems": 20,
-            "maxItems": 24,
+            "minItems": 12,
+            "maxItems": 12,
             "items": { "$ref": "#/$defs/button" }
           }
         },
