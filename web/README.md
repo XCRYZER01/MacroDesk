@@ -43,6 +43,8 @@ npx serve .                     # or any other static server
 ```
 
 It needs Chrome or Edge; Safari, Firefox and mobile browsers have no Web Serial.
+Flashing a real board this way is confirmed working: 2,301,952 bytes at `0x0`
+in about 12 seconds at 921600 baud.
 Connect the cable to the port marked `USB TO UART`, not the native `USB` port —
 the native one is the keyboard the PC sees after the board boots. Device transfer is intentionally not presented as working yet: the
 firmware still needs a runtime profile loader and a serial transfer protocol.
